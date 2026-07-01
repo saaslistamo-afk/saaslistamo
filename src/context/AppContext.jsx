@@ -109,7 +109,7 @@ export function AppProvider({ children }) {
     const subs = [];
     const perfilRef = doc(db, "usuarios", uid);
 
-    // perfil do usuário
+    // perfil do usuário — libera a tela assim que chegar
     subs.push(onSnapshot(perfilRef, (snap) => {
       if (!snap.exists()) {
         setDoc(perfilRef, {
@@ -117,6 +117,8 @@ export function AppProvider({ children }) {
           email: authUser?.email ?? "",
           nome:  authUser?.displayName ?? "",
         }).catch(console.error);
+        // novo usuário: libera imediatamente com os padrões
+        setCarregando(false);
         return;
       }
       const d = snap.data();
@@ -131,6 +133,8 @@ export function AppProvider({ children }) {
       setFaixasIdadeLocal((d.faixasIdade ?? []).map(normalizarMorador));
       setRestricoesLocal(d.restricoesAlimentares ?? []);
       setTrialBannerVisivelLocal(d.trialBannerVisivel ?? true);
+      // libera a tela assim que o perfil chega — o resto carrega em segundo plano
+      setCarregando(false);
     }));
 
     // listas
@@ -145,10 +149,9 @@ export function AppProvider({ children }) {
       setDespensa(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }));
 
-    // historicoPrecos — quando chegar, marca carregamento concluído
+    // historicoPrecos
     subs.push(onSnapshot(collection(db, "usuarios", uid, "historicoPrecos"), (snap) => {
       setHistoricoPrecos(snap.docs.map((d) => d.data()));
-      setCarregando(false);
     }));
 
     return () => subs.forEach((u) => u());
