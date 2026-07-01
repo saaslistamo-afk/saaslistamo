@@ -72,8 +72,19 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
+        {/* Orçamento */}
+        <Card className="animate-rise p-6 lg:order-last" style={{ animationDelay: "60ms" }}>
+          <BudgetJar gasto={gastoMes} orcamento={orcamento} size={104} onEditar={() => setEditandoOrcamento(true)} />
+          {mesAnterior && (
+            <div className="mt-5 flex items-center gap-2 rounded-lg bg-cream-100 px-3 py-2 text-xs font-medium text-ink-600">
+              {variacao <= 0 ? <TrendingDown className="h-4 w-4 text-forest-600" /> : <TrendingUp className="h-4 w-4 text-terracotta-600" />}
+              {Math.abs(variacao).toFixed(0)}% {variacao <= 0 ? "menor" : "maior"} que {mesAnterior.mes}
+            </div>
+          )}
+        </Card>
+
         {/* Lista ativa */}
-        <Card className="animate-rise p-6 lg:col-span-2" style={{ animationDelay: "60ms" }}>
+        <Card className="animate-rise p-6 lg:col-span-2 lg:order-first" style={{ animationDelay: "120ms" }}>
           {listaAtiva ? (
             <>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -112,17 +123,6 @@ export default function Dashboard() {
               <Button className="mt-4" onClick={() => navigate("/nova-lista")}>
                 <ListPlus className="h-4 w-4" /> Começar lista
               </Button>
-            </div>
-          )}
-        </Card>
-
-        {/* Orçamento */}
-        <Card className="animate-rise p-6" style={{ animationDelay: "120ms" }}>
-          <BudgetJar gasto={gastoMes} orcamento={orcamento} size={104} onEditar={() => setEditandoOrcamento(true)} />
-          {mesAnterior && (
-            <div className="mt-5 flex items-center gap-2 rounded-lg bg-cream-100 px-3 py-2 text-xs font-medium text-ink-600">
-              {variacao <= 0 ? <TrendingDown className="h-4 w-4 text-forest-600" /> : <TrendingUp className="h-4 w-4 text-terracotta-600" />}
-              {Math.abs(variacao).toFixed(0)}% {variacao <= 0 ? "menor" : "maior"} que {mesAnterior.mes}
             </div>
           )}
         </Card>
