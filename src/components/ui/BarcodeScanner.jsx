@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Loader, Zap, ZapOff } from "lucide-react";
 import Button from "./Button";
 
@@ -72,8 +72,10 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
   const [etapa, setEtapa]             = useState("camera");
   const [erro, setErro]               = useState("");
   const [codigoLido, setCodigoLido]   = useState("");
+  const [nomeManual, setNomeManual]   = useState("");
   const [lanterna, setLanterna]       = useState(false);
   const [temLanterna, setTemLanterna] = useState(false);
+  const iniciarRef = useRef(null);
 
   async function toggleLanterna() {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -142,6 +144,7 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
       }
     }
 
+    iniciarRef.current = iniciar;
     iniciar();
     return () => {
       sinalRef.current.parado = true;
@@ -150,16 +153,16 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
     };
   }, []);
 
-  function reiniciar() {
+  function tentarNovamente() {
     sinalRef.current.parado = false;
     setEtapa("camera");
     setCodigoLido("");
-    // reinicia a câmera
+    setNomeManual("");
+    // reinicia a câmera e o loop de scan
+    controlsRef.current?.stop?.();
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    const scanner = document.querySelector("video");
-    if (scanner) scanner.srcObject = null;
-    // remonta o componente forçando novo useEffect via key — feito pelo pai
-    onCancelar();
+    streamRef.current = null;
+    if (iniciarRef.current) iniciarRef.current();
   }
 
   return (
@@ -203,21 +206,35 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
         )}
 
         {etapa === "nao_encontrado" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink-900/80 px-8 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink-900/90 px-8 text-center">
             <p className="font-display text-lg font-semibold text-cream-50">Produto não identificado</p>
-            <p className="text-sm text-cream-50/70">
-              Código <span className="font-mono text-cream-50/90">{codigoLido}</span> não encontrado na base.
+            <p className="text-sm text-cream-50/60">
+              Código <span className="font-mono">{codigoLido}</span>
             </p>
+            {/* input inline — sem fechar o scanner, sem tela branca */}
+            <div className="w-full max-w-xs">
+              <input
+                autoFocus
+                value={nomeManual}
+                onChange={(e) => setNomeManual(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && nomeManual.trim() && onScan({ nome: nomeManual.trim(), codigo: codigoLido })}
+                placeholder="Digite o nome do produto"
+                className="w-full rounded-xl border border-cream-50/20 bg-cream-50/10 px-4 py-3 text-sm text-cream-50 outline-none placeholder:text-cream-50/40 focus:border-forest-400"
+              />
+            </div>
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 className="border-cream-50/20 text-cream-50 hover:bg-cream-50/10"
-                onClick={() => { sinalRef.current.parado = false; setEtapa("camera"); }}
+                onClick={tentarNovamente}
               >
                 Tentar novamente
               </Button>
-              <Button onClick={() => onScan({ nome: "", codigo: codigoLido })}>
-                Digitar nome
+              <Button
+                disabled={!nomeManual.trim()}
+                onClick={() => onScan({ nome: nomeManual.trim(), codigo: codigoLido })}
+              >
+                Confirmar
               </Button>
             </div>
           </div>
