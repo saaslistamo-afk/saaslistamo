@@ -7,7 +7,7 @@ import Button from "../components/ui/Button";
 import ScanButton from "../components/ui/ScanButton";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import { useApp } from "../context/AppContext";
-import { CATEGORIAS, HOJE_MOCK, statusValidade, diasParaVencer } from "../mock/data";
+import { CATEGORIAS, statusValidade, diasParaVencer } from "../mock/data";
 import { inferirCategoria } from "../utils/categorizar";
 
 const FILTROS = [
@@ -17,7 +17,7 @@ const FILTROS = [
   { id: "valido", label: "Válidos" },
 ];
 
-const HOJE = new Date(HOJE_MOCK);
+const HOJE = new Date();
 
 
 const STATUS_INFO = {

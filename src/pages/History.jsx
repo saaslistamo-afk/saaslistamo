@@ -4,11 +4,13 @@ import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import ReceiptModal from "../components/layout/ReceiptModal";
 import { useApp } from "../context/AppContext";
-import { HISTORICO, HOJE_MOCK } from "../mock/data";
+import { HISTORICO } from "../mock/data";
 import { inferirCategoria } from "../utils/categorizar";
 
-const MES_ATUAL_PREFIXO = HOJE_MOCK.slice(0, 7);
-const MES_ATUAL_LABEL = "Junho 2026";
+const _hoje = new Date();
+const MES_ATUAL_PREFIXO = _hoje.toISOString().slice(0, 7);
+const MES_ATUAL_LABEL = _hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+  .replace(/^./, (c) => c.toUpperCase());
 
 function BotaoApagar({ onConfirmar }) {
   const [confirmando, setConfirmando] = useState(false);

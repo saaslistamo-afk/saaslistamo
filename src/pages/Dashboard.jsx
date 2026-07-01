@@ -12,11 +12,14 @@ import BudgetJar from "../components/ui/BudgetJar";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
 import { useApp } from "../context/AppContext";
-import { HISTORICO, CATEGORIAS, statusValidade, diasParaVencer, HOJE_MOCK } from "../mock/data";
+import { HISTORICO, CATEGORIAS, statusValidade, diasParaVencer } from "../mock/data";
 import { gastoPorCategoria, itensEsquecidos } from "../utils/precos";
 import scanBg from "../assets/scan-bg.png";
 
-const MES_ATUAL_PREFIXO = HOJE_MOCK.slice(0, 7);
+const _hoje = new Date();
+const MES_ATUAL_PREFIXO = _hoje.toISOString().slice(0, 7);
+const DATA_FORMATADA = _hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+  .replace(/^./, (c) => c.toUpperCase());
 
 function formatBRL(v) {
   return `R$ ${v.toFixed(2).replace(".", ",")}`;
@@ -39,13 +42,13 @@ export default function Dashboard() {
     .sort((a, b) => a.dias - b.dias);
 
   const gastoCategorias = gastoPorCategoria(historicoPrecos, MES_ATUAL_PREFIXO);
-  const itensEsquecidosReais = itensEsquecidos(historicoPrecos, HOJE_MOCK);
+  const itensEsquecidosReais = itensEsquecidos(historicoPrecos, _hoje.toISOString().slice(0, 10));
 
   return (
     <div className="mx-auto max-w-5xl">
       <div className="animate-rise flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-ink-400">Quinta-feira, 30 de junho</p>
+          <p className="text-sm font-medium text-ink-400">{DATA_FORMATADA}</p>
           <h1 className="font-display text-[1.9rem] font-semibold text-ink-900">Olá, {usuario.nome.split(" ")[0]}</h1>
         </div>
         <div className="hidden gap-2 sm:flex">

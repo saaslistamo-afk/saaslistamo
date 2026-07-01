@@ -1,8 +1,6 @@
 // Dados fictícios para construção da interface (sem backend ainda).
 
-// "hoje" fixo da simulação — única fonte da data, usado em todo cálculo de
-// validade/recência (despensa, histórico de preços, itens esquecidos etc.)
-export const HOJE_MOCK = "2026-06-30";
+export const HOJE_MOCK = new Date().toISOString().slice(0, 10);
 
 export const PLANOS = [
   {

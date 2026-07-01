@@ -1,8 +1,11 @@
 import { createContext, useContext, useState, useMemo, useEffect } from "react";
-import { USUARIO, LISTA_ATIVA, MERCADOS_CONHECIDOS, HISTORICO_PRECOS, DESPENSA, HOJE_MOCK } from "../mock/data";
+import { USUARIO, LISTA_ATIVA, MERCADOS_CONHECIDOS, HISTORICO_PRECOS, DESPENSA } from "../mock/data";
+import { useAuth } from "./AuthContext";
 
-const MES_ATUAL_LABEL   = "Junho 2026";
-const MES_ATUAL_PREFIXO = HOJE_MOCK.slice(0, 7);
+const _hoje = new Date();
+const MES_ATUAL_PREFIXO = _hoje.toISOString().slice(0, 7);
+const MES_ATUAL_LABEL   = _hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+  .replace(/^./, (c) => c.toUpperCase());
 
 const AppContext   = createContext(null);
 const ORDEM_PLANOS = ["premium"];
@@ -27,7 +30,14 @@ function normalizarMorador(item) {
 }
 
 export function AppProvider({ children }) {
+  const { usuario } = useAuth();
   const [plano, setPlano] = useState("trial");
+
+  // sincroniza o plano com o metadata do Supabase a cada login/logout
+  useEffect(() => {
+    const planoDaMetadata = usuario?.user_metadata?.plano;
+    setPlano(planoDaMetadata ?? "trial");
+  }, [usuario]);
   const [trialBannerVisivel, setTrialBannerVisivel] = usarEstadoPersistido("listamo:trialBanner", true);
   const [orcamento, setOrcamento]                   = usarEstadoPersistido("listamo:orcamento", LISTA_ATIVA.orcamentoDefinido);
   const [listas, setListas]                         = usarEstadoPersistido("listamo:listas", [LISTA_ATIVA]);
@@ -53,7 +63,7 @@ export function AppProvider({ children }) {
 
   // — Listas CRUD —
   function criarLista(nomeParam) {
-    const nova = { id: `lista-${Date.now()}`, nome: nomeParam?.trim() || "Nova lista", mes: MES_ATUAL_LABEL, itens: [], criadaEm: HOJE_MOCK };
+    const nova = { id: `lista-${Date.now()}`, nome: nomeParam?.trim() || "Nova lista", mes: MES_ATUAL_LABEL, itens: [], criadaEm: new Date().toISOString().slice(0, 10) };
     setListas((prev) => [nova, ...prev]);
     return nova;
   }
@@ -76,7 +86,7 @@ export function AppProvider({ children }) {
     atualizarItensLista(listaId, (itens) => itens.filter((i) => i.status !== "carrinho"));
     setHistoricoPrecos((prev) => [
       ...prev,
-      ...comprados.map((i) => ({ produto: i.nome, preco: i.preco, quantidade: i.quantidade, mercado: mercadoAtual, data: HOJE_MOCK })),
+      ...comprados.map((i) => ({ produto: i.nome, preco: i.preco, quantidade: i.quantidade, mercado: mercadoAtual, data: new Date().toISOString().slice(0, 10) })),
     ]);
     return total;
   }
@@ -126,11 +136,17 @@ export function AppProvider({ children }) {
   );
 
   const value = useMemo(() => {
-    const isPremium = plano === "trial" || plano === "premium";
+    const diasUsados = usuario?.created_at
+      ? Math.floor((Date.now() - new Date(usuario.created_at).getTime()) / 86_400_000)
+      : 0;
+    const trialDiasRestantes = Math.max(0, 3 - diasUsados);
+    const trialAtivo = trialDiasRestantes > 0;
+    const isPremium = plano === "premium" || (plano === "trial" && trialAtivo);
     return {
-      usuario: { nome, email, trialDiasRestantes: 3, perfilCasa: { faixasIdade, restricoes: restricoesAlimentares } },
+      usuario: { nome, email, trialDiasRestantes, perfilCasa: { faixasIdade, restricoes: restricoesAlimentares } },
       plano, setPlano,
       isPremium,
+      trialAtivo,
       isEssencialOuMais: isPremium,
       trialBannerVisivel, setTrialBannerVisivel,
       orcamento, setOrcamento,
@@ -151,7 +167,7 @@ export function AppProvider({ children }) {
       notificacoes, setNotificacoes,
     };
   }, [
-    plano, trialBannerVisivel, orcamento, listas, gastoMes,
+    usuario, plano, trialBannerVisivel, orcamento, listas, gastoMes,
     mercados, mercadoAtual, historicoPrecos, despensa,
     faixasIdade, restricoesAlimentares, darkMode, fotoPerfil, nome, email, notificacoes,
     mesesApagados, boasVindasPremium,
