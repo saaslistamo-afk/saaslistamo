@@ -7,20 +7,39 @@ const FORMATOS_BARCODE = [
   "code_128", "code_39", "qr_code", "itf",
 ];
 
-async function buscarProduto(codigo) {
+async function buscarOpenFoodFacts(codigo, base = "world") {
   try {
     const res = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${codigo}.json`,
-      { signal: AbortSignal.timeout(6000) }
+      `https://${base}.openfoodfacts.org/api/v2/product/${codigo}.json`,
+      { signal: AbortSignal.timeout(5000) }
     );
     const data = await res.json();
     if (data.status !== 1) return null;
     const p = data.product;
     const nome = p.product_name_pt || p.product_name || p.product_name_en || null;
-    return nome ? { nome: nome.trim(), codigo } : null;
-  } catch {
-    return null;
-  }
+    return nome ? nome.trim() : null;
+  } catch { return null; }
+}
+
+async function buscarUPCItemDB(codigo) {
+  try {
+    const res = await fetch(
+      `https://api.upcitemdb.com/prod/trial/lookup?upc=${codigo}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    const data = await res.json();
+    const item = data?.items?.[0];
+    return item?.title ? item.title.trim() : null;
+  } catch { return null; }
+}
+
+// tenta as bases em cascata: BR → Global → UPC Item DB
+async function buscarProduto(codigo) {
+  const nome =
+    (await buscarOpenFoodFacts(codigo, "br")) ||
+    (await buscarOpenFoodFacts(codigo, "world")) ||
+    (await buscarUPCItemDB(codigo));
+  return nome ? { nome, codigo } : null;
 }
 
 // Escaneia usando a API nativa do navegador (Chrome Android) — muito mais precisa
