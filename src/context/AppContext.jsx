@@ -154,6 +154,7 @@ export function AppProvider({ children }) {
     plano, trialBannerVisivel, orcamento, listas, gastoMes,
     mercados, mercadoAtual, historicoPrecos, despensa,
     faixasIdade, restricoesAlimentares, darkMode, fotoPerfil, nome, email, notificacoes,
+    mesesApagados, boasVindasPremium,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
