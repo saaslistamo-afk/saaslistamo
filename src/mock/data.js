@@ -233,19 +233,19 @@ export const HISTORICO_PRECOS = [
   { produto: "Manteiga", preco: 7.9, mercado: "Carrefour", data: "2026-05-29" },
 ];
 
-export function diasParaVencer(dataValidade, hoje = new Date(HOJE_MOCK)) {
+export function diasParaVencer(dataValidade, hoje = new Date()) {
   const venc = new Date(dataValidade);
   const diff = Math.ceil((venc - hoje) / (1000 * 60 * 60 * 24));
   return diff;
 }
 
-export function statusValidade(dataValidade, hoje = new Date(HOJE_MOCK)) {
+export function statusValidade(dataValidade, hoje = new Date()) {
   const dias = diasParaVencer(dataValidade, hoje);
   if (dias < 0) return "vencido";
   if (dias <= 3) return "vencendo";
   return "valido";
 }
 
-export function diasAtras(data, hoje = new Date(HOJE_MOCK)) {
+export function diasAtras(data, hoje = new Date()) {
   return Math.max(0, Math.round((hoje - new Date(data)) / (1000 * 60 * 60 * 24)));
 }
