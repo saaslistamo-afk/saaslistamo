@@ -166,7 +166,7 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink-900">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#111]">
       <div className="relative flex-1 overflow-hidden">
         <video
           ref={videoRef}
@@ -198,7 +198,7 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
         )}
 
         {etapa === "buscando" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink-900/80">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#111]/80">
             <Loader className="h-8 w-8 animate-spin text-forest-400" />
             <p className="text-sm font-medium text-cream-50">Identificando produto...</p>
             <p className="font-mono text-xs text-cream-50/50">{codigoLido}</p>
@@ -206,7 +206,7 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
         )}
 
         {etapa === "nao_encontrado" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink-900/90 px-8 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#111]/95 px-8 text-center">
             <p className="font-display text-lg font-semibold text-cream-50">Produto não identificado</p>
             <p className="text-sm text-cream-50/60">
               Código <span className="font-mono">{codigoLido}</span>
@@ -243,14 +243,14 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
         {temLanterna && etapa === "camera" && (
           <button
             onClick={toggleLanterna}
-            className="absolute bottom-28 right-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-ink-900/60 text-cream-50 backdrop-blur-sm hover:bg-ink-900/80"
+            className="absolute bottom-28 right-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#111]/60 text-cream-50 backdrop-blur-sm hover:bg-[#111]/80"
           >
             {lanterna ? <ZapOff className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
           </button>
         )}
       </div>
 
-      <div className="flex items-center justify-center bg-ink-900 p-6">
+      <div className="flex items-center justify-center bg-[#111] p-6">
         <button
           onClick={onCancelar}
           className="flex cursor-pointer items-center gap-2 rounded-full border border-cream-50/20 px-5 py-2.5 text-sm font-medium text-cream-50 hover:bg-cream-50/10"
