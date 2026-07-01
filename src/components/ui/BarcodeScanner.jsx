@@ -1,20 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from "@zxing/library";
 import { X, Loader, Zap, ZapOff } from "lucide-react";
 import Button from "./Button";
 
-const HINTS = new Map([
-  [DecodeHintType.TRY_HARDER, true],
-  [DecodeHintType.POSSIBLE_FORMATS, [
-    BarcodeFormat.EAN_13,
-    BarcodeFormat.EAN_8,
-    BarcodeFormat.UPC_A,
-    BarcodeFormat.UPC_E,
-    BarcodeFormat.CODE_128,
-    BarcodeFormat.CODE_39,
-    BarcodeFormat.QR_CODE,
-  ]],
-]);
+const FORMATOS_BARCODE = [
+  "ean_13", "ean_8", "upc_a", "upc_e",
+  "code_128", "code_39", "qr_code", "itf",
+];
 
 async function buscarProduto(codigo) {
   try {
@@ -32,14 +23,56 @@ async function buscarProduto(codigo) {
   }
 }
 
+// Escaneia usando a API nativa do navegador (Chrome Android) — muito mais precisa
+async function escanearNativo(videoEl, onEncontrado, sinalParar) {
+  const detector = new window.BarcodeDetector({ formats: FORMATOS_BARCODE });
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  async function loop() {
+    if (sinalParar.parado || videoEl.readyState < 2) {
+      if (!sinalParar.parado) requestAnimationFrame(loop);
+      return;
+    }
+    canvas.width  = videoEl.videoWidth;
+    canvas.height = videoEl.videoHeight;
+    ctx.drawImage(videoEl, 0, 0);
+    try {
+      const resultados = await detector.detect(canvas);
+      if (resultados.length > 0 && !sinalParar.parado) {
+        sinalParar.parado = true;
+        onEncontrado(resultados[0].rawValue);
+        return;
+      }
+    } catch {}
+    if (!sinalParar.parado) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+// Fallback com @zxing/browser para iOS e Firefox
+async function escanearZxing(stream, videoEl, onEncontrado, sinalParar) {
+  const { BrowserMultiFormatReader } = await import("@zxing/browser");
+  const reader = new BrowserMultiFormatReader();
+  const controls = await reader.decodeFromStream(stream, videoEl, async (result) => {
+    if (!result || sinalParar.parado) return;
+    sinalParar.parado = true;
+    controls.stop();
+    onEncontrado(result.getText());
+  });
+  return controls;
+}
+
 export default function BarcodeScanner({ onScan, onCancelar }) {
   const videoRef    = useRef(null);
   const streamRef   = useRef(null);
+  const sinalRef    = useRef({ parado: false });
   const controlsRef = useRef(null);
-  const [etapa, setEtapa]           = useState("camera");
-  const [erro, setErro]             = useState("");
-  const [codigoLido, setCodigoLido] = useState("");
-  const [lanterna, setLanterna]     = useState(false);
+
+  const [etapa, setEtapa]             = useState("camera");
+  const [erro, setErro]               = useState("");
+  const [codigoLido, setCodigoLido]   = useState("");
+  const [lanterna, setLanterna]       = useState(false);
   const [temLanterna, setTemLanterna] = useState(false);
 
   async function toggleLanterna() {
@@ -51,13 +84,23 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
     } catch {}
   }
 
-  useEffect(() => {
-    let ativo = true;
-    const reader = new BrowserMultiFormatReader(HINTS, 300); // tenta a cada 300ms
+  async function aoEncontrarCodigo(codigo) {
+    setCodigoLido(codigo);
+    setEtapa("buscando");
+    const produto = await buscarProduto(codigo);
+    if (sinalRef.current.parado && !produto) {
+      setEtapa("nao_encontrado");
+    } else if (produto) {
+      onScan(produto);
+    } else {
+      setEtapa("nao_encontrado");
+    }
+  }
 
+  useEffect(() => {
     async function iniciar() {
       try {
-        // pede câmera traseira em HD — constraints avançadas opcionais
+        // tenta stream HD com câmera traseira
         let stream;
         try {
           stream = await navigator.mediaDevices.getUserMedia({
@@ -65,49 +108,32 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
               facingMode: { ideal: "environment" },
               width:  { ideal: 1920 },
               height: { ideal: 1080 },
-              advanced: [
-                { focusMode: "continuous" },
-                { exposureMode: "continuous" },
-                { whiteBalanceMode: "continuous" },
-              ],
             },
           });
         } catch {
-          // fallback sem constraints avançadas (iOS Safari, browsers antigos)
           stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: "environment" } },
           });
         }
 
-        if (!ativo) { stream.getTracks().forEach((t) => t.stop()); return; }
-
         streamRef.current = stream;
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
 
-        // verifica se a lanterna está disponível
+        // lanterna disponível?
         const track = stream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities?.() ?? {};
-        setTemLanterna(!!capabilities.torch);
+        const caps  = track.getCapabilities?.() ?? {};
+        setTemLanterna(!!caps.torch);
 
-        const controls = await reader.decodeFromStream(stream, videoRef.current, async (result, err) => {
-          if (!result || !ativo) return;
-          controls.stop();
-          stream.getTracks().forEach((t) => t.stop());
-          const codigo = result.getText();
-          setCodigoLido(codigo);
-          setEtapa("buscando");
-          const produto = await buscarProduto(codigo);
-          if (!ativo) return;
-          if (produto) {
-            onScan(produto);
-          } else {
-            setEtapa("nao_encontrado");
-          }
-        });
-
-        if (ativo) controlsRef.current = controls;
+        // usa API nativa se disponível (Android Chrome), senão usa zxing (iOS)
+        if ("BarcodeDetector" in window) {
+          escanearNativo(videoRef.current, aoEncontrarCodigo, sinalRef.current);
+        } else {
+          controlsRef.current = await escanearZxing(
+            stream, videoRef.current, aoEncontrarCodigo, sinalRef.current
+          );
+        }
       } catch (e) {
-        if (!ativo) return;
         if (e.name === "NotAllowedError") {
           setErro("Permissão de câmera negada. Habilite nas configurações do navegador.");
         } else {
@@ -118,11 +144,23 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
 
     iniciar();
     return () => {
-      ativo = false;
-      controlsRef.current?.stop();
+      sinalRef.current.parado = true;
+      controlsRef.current?.stop?.();
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  function reiniciar() {
+    sinalRef.current.parado = false;
+    setEtapa("camera");
+    setCodigoLido("");
+    // reinicia a câmera
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    const scanner = document.querySelector("video");
+    if (scanner) scanner.srcObject = null;
+    // remonta o componente forçando novo useEffect via key — feito pelo pai
+    onCancelar();
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink-900">
@@ -135,7 +173,6 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
           playsInline
         />
 
-        {/* mira */}
         {etapa === "camera" && !erro && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="relative h-52 w-72">
@@ -145,8 +182,8 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
               <span className="absolute bottom-0 right-0 h-8 w-8 border-b-4 border-r-4 border-forest-400 rounded-br-lg" />
               <span className="absolute inset-x-4 top-1/2 h-0.5 -translate-y-1/2 animate-pulse-soft bg-terracotta-400" />
             </div>
-            <p className="absolute bottom-28 left-0 right-0 text-center text-sm font-medium text-cream-50/80 px-6">
-              Mantenha o código de barras dentro da moldura
+            <p className="absolute bottom-28 left-0 right-0 px-6 text-center text-sm font-medium text-cream-50/80">
+              Centralize o código de barras dentro da moldura — mantenha a ~15cm
             </p>
           </div>
         )}
@@ -161,7 +198,7 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink-900/80">
             <Loader className="h-8 w-8 animate-spin text-forest-400" />
             <p className="text-sm font-medium text-cream-50">Identificando produto...</p>
-            <p className="text-xs text-cream-50/50 font-mono">{codigoLido}</p>
+            <p className="font-mono text-xs text-cream-50/50">{codigoLido}</p>
           </div>
         )}
 
@@ -169,35 +206,13 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink-900/80 px-8 text-center">
             <p className="font-display text-lg font-semibold text-cream-50">Produto não identificado</p>
             <p className="text-sm text-cream-50/70">
-              Código <span className="font-mono text-cream-50/90">{codigoLido}</span> não encontrado. Adicione o nome manualmente.
+              Código <span className="font-mono text-cream-50/90">{codigoLido}</span> não encontrado na base.
             </p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 className="border-cream-50/20 text-cream-50 hover:bg-cream-50/10"
-                onClick={() => {
-                  setEtapa("camera");
-                  const reader = new BrowserMultiFormatReader(HINTS, 300);
-                  navigator.mediaDevices.getUserMedia({
-                    video: {
-                      facingMode: { ideal: "environment" },
-                      width: { ideal: 1920 }, height: { ideal: 1080 },
-                      advanced: [{ focusMode: "continuous" }],
-                    },
-                  }).then((stream) => {
-                    streamRef.current = stream;
-                    videoRef.current.srcObject = stream;
-                    reader.decodeFromStream(stream, videoRef.current, async (result) => {
-                      if (!result) return;
-                      const codigo = result.getText();
-                      setCodigoLido(codigo);
-                      setEtapa("buscando");
-                      const produto = await buscarProduto(codigo);
-                      if (produto) onScan(produto);
-                      else setEtapa("nao_encontrado");
-                    }).then(c => { controlsRef.current = c; });
-                  });
-                }}
+                onClick={() => { sinalRef.current.parado = false; setEtapa("camera"); }}
               >
                 Tentar novamente
               </Button>
@@ -208,16 +223,12 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
           </div>
         )}
 
-        {/* botão de lanterna */}
         {temLanterna && etapa === "camera" && (
           <button
             onClick={toggleLanterna}
             className="absolute bottom-28 right-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-ink-900/60 text-cream-50 backdrop-blur-sm hover:bg-ink-900/80"
           >
-            {lanterna
-              ? <ZapOff className="h-5 w-5" />
-              : <Zap className="h-5 w-5" />
-            }
+            {lanterna ? <ZapOff className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
           </button>
         )}
       </div>
