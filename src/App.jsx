@@ -15,27 +15,13 @@ const HouseholdProfile = lazy(() => import("./pages/HouseholdProfile"));
 
 function RotaPrivada({ children }) {
   const { usuario } = useAuth();
-
-  // só aguarda o Firebase Auth resolver (rápido) — dados do Firestore
-  // carregam em segundo plano enquanto o app já está visível
-  if (usuario === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-cream-100">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-forest-200 border-t-forest-700" />
-          <p className="text-sm font-medium text-ink-400">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-  if (usuario === null) return <Navigate to="/login" replace />;
+  if (!usuario) return <Navigate to="/login" replace />;
   return children;
 }
 
 function RotaPublica({ children }) {
   const { usuario } = useAuth();
-  if (usuario === undefined) return null;
-  if (usuario !== null) return <Navigate to="/dashboard" replace />;
+  if (usuario) return <Navigate to="/dashboard" replace />;
   return children;
 }
 

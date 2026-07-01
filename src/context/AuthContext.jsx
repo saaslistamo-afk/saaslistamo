@@ -11,7 +11,10 @@ import { auth } from "../lib/firebase";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [usuario, setUsuario] = useState(undefined); // undefined = ainda carregando
+  // começa como null (não logado) em vez de undefined (carregando)
+  // → mostra login imediatamente; se houver sessão ativa, Firebase redireciona
+  // automaticamente em 2-3s sem mostrar nenhum spinner
+  const [usuario, setUsuario] = useState(null);
 
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => setUsuario(u ?? null));
