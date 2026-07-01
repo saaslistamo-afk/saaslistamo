@@ -1,15 +1,17 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import AppShell from "./components/layout/AppShell";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import PlanSelect from "./pages/PlanSelect";
-import NewList from "./pages/NewList";
-import MarketMode from "./pages/MarketMode";
-import Pantry from "./pages/Pantry";
-import ComparePrices from "./pages/ComparePrices";
-import History from "./pages/History";
-import HouseholdProfile from "./pages/HouseholdProfile";
 import { useAuth } from "./context/AuthContext";
+
+const Dashboard       = lazy(() => import("./pages/Dashboard"));
+const PlanSelect      = lazy(() => import("./pages/PlanSelect"));
+const NewList         = lazy(() => import("./pages/NewList"));
+const MarketMode      = lazy(() => import("./pages/MarketMode"));
+const Pantry          = lazy(() => import("./pages/Pantry"));
+const ComparePrices   = lazy(() => import("./pages/ComparePrices"));
+const History         = lazy(() => import("./pages/History"));
+const HouseholdProfile = lazy(() => import("./pages/HouseholdProfile"));
 
 function RotaPrivada({ children }) {
   const { usuario } = useAuth();
@@ -43,6 +45,7 @@ function ComShell({ children }) {
 
 export default function App() {
   return (
+    <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<RotaPublica><Login /></RotaPublica>} />
@@ -56,5 +59,6 @@ export default function App() {
       <Route path="/perfil-casa" element={<RotaPrivada><ComShell><HouseholdProfile /></ComShell></RotaPrivada>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </Suspense>
   );
 }

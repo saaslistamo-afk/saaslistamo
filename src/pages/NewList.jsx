@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import {
   Plus, Trash2, ScanLine, FileDown, Sparkle, X, ShoppingBasket, Pencil, Check, Scale, Tag,
   ChevronRight, ListPlus, ArrowLeft,
@@ -10,7 +10,7 @@ import BudgetJar from "../components/ui/BudgetJar";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
 import { useApp } from "../context/AppContext";
-import BarcodeScanner from "../components/ui/BarcodeScanner";
+const BarcodeScanner = lazy(() => import("../components/ui/BarcodeScanner"));
 import { CATEGORIAS } from "../mock/data";
 import { inferirCategoria, quantidadeSugerida, restricaoConflitante } from "../utils/categorizar";
 import { ultimoPrecoPorMercado, produtosRecorrentes, ehRecorrente } from "../utils/precos";
@@ -442,10 +442,12 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
       </div>
 
       {scannerAberto && (
-        <BarcodeScanner
-          onScan={aoReceberProdutoEscaneado}
-          onCancelar={() => setScannerAberto(false)}
-        />
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            onScan={aoReceberProdutoEscaneado}
+            onCancelar={() => setScannerAberto(false)}
+          />
+        </Suspense>
       )}
 
       {editandoOrcamento && (

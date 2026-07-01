@@ -12,7 +12,8 @@ import CategoryIcon from "../components/ui/CategoryIcon";
 import { useApp } from "../context/AppContext";
 import { inferirCategoria } from "../utils/categorizar";
 import { encontrarMelhorCorrespondencia } from "../utils/correspondencia";
-import BarcodeScanner from "../components/ui/BarcodeScanner";
+import { lazy, Suspense } from "react";
+const BarcodeScanner = lazy(() => import("../components/ui/BarcodeScanner"));
 
 const LIMIAR_CONFIANTE = 0.85;
 
@@ -279,12 +280,14 @@ function SessaoDeCompra({ lista, onTrocarLista }) {
         </div>
       </div>
 
-      {/* câmera real de escaneamento */}
+      {/* câmera real de escaneamento — carrega o @zxing só quando necessário */}
       {scannerAberto && (
-        <BarcodeScanner
-          onScan={aoReceberProdutoEscaneado}
-          onCancelar={fecharScanner}
-        />
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            onScan={aoReceberProdutoEscaneado}
+            onCancelar={fecharScanner}
+          />
+        </Suspense>
       )}
 
       {/* modais pós-escaneamento (confirmar item ou adicionar extra) */}
