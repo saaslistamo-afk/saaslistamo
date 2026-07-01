@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, KeyRound, Eye, EyeOff, ArrowRight, Carrot, Croissant, Milk, ShoppingBasket } from "lucide-react";
 import Button from "../components/ui/Button";
+import { useAuth } from "../context/AuthContext";
 import logoNova from "../assets/logo-nova.png";
 import logoMark from "../assets/logo-mark.png";
 
@@ -10,11 +11,27 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [verSenha, setVerSenha] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+  const { entrar, cadastrar } = useAuth();
   const navigate = useNavigate();
 
-  function aoEnviar(e) {
+  async function aoEnviar(e) {
     e.preventDefault();
-    navigate("/dashboard");
+    setErro("");
+    setCarregando(true);
+    try {
+      if (modo === "entrar") {
+        await entrar(email, senha);
+      } else {
+        await cadastrar(email, senha);
+      }
+      navigate("/dashboard");
+    } catch (err) {
+      setErro(traduzirErro(err.message));
+    } finally {
+      setCarregando(false);
+    }
   }
 
   return (
@@ -116,9 +133,13 @@ export default function Login() {
               </span>
             </label>
 
-            <Button type="submit" size="lg" className="mt-2 w-full justify-between">
-              {modo === "entrar" ? "Entrar" : "Criar minha conta"}
-              <ArrowRight className="h-4 w-4" />
+            {erro && (
+              <p className="rounded-lg bg-rose-100 px-3.5 py-2.5 text-sm font-medium text-rose-600">{erro}</p>
+            )}
+
+            <Button type="submit" size="lg" className="mt-2 w-full justify-between" disabled={carregando}>
+              {carregando ? "Aguarde..." : modo === "entrar" ? "Entrar" : "Criar minha conta"}
+              {!carregando && <ArrowRight className="h-4 w-4" />}
             </Button>
           </form>
 
@@ -136,5 +157,15 @@ export default function Login() {
       </div>
     </div>
   );
+}
+
+function traduzirErro(msg) {
+  if (msg.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
+  if (msg.includes("Email not confirmed"))       return "Confirme seu e-mail antes de entrar.";
+  if (msg.includes("User already registered"))   return "Esse e-mail já tem uma conta. Tente entrar.";
+  if (msg.includes("Password should be"))        return "Senha muito fraca — use ao menos 6 caracteres.";
+  if (msg.includes("Unable to validate"))        return "E-mail inválido.";
+  if (msg.includes("rate limit"))                return "Muitas tentativas. Aguarde alguns minutos.";
+  return "Algo deu errado. Tente novamente.";
 }
 

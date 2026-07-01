@@ -4,6 +4,7 @@ import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard } from "lucide-r
 import Button from "../ui/Button";
 import Switch from "../ui/Switch";
 import { useApp } from "../../context/AppContext";
+import { useAuth } from "../../context/AuthContext";
 
 function iniciais(nome) {
   return nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
@@ -15,6 +16,7 @@ export default function ProfilePanel({ aberto, onFechar }) {
     darkMode, setDarkMode, fotoPerfil, setFotoPerfil,
     nome, setNome, email, setEmail, notificacoes, setNotificacoes,
   } = useApp();
+  const { sair } = useAuth();
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
@@ -36,8 +38,9 @@ export default function ProfilePanel({ aberto, onFechar }) {
     navigate(rota);
   }
 
-  function aoSair() {
+  async function aoSair() {
     onFechar();
+    await sair();
     navigate("/login");
   }
 
