@@ -57,19 +57,27 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
 
     async function iniciar() {
       try {
-        // pede stream com foco contínuo e resolução alta
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width:  { ideal: 1920 },
-            height: { ideal: 1080 },
-            advanced: [
-              { focusMode: "continuous" },
-              { exposureMode: "continuous" },
-              { whiteBalanceMode: "continuous" },
-            ],
-          },
-        });
+        // pede câmera traseira em HD — constraints avançadas opcionais
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: "environment" },
+              width:  { ideal: 1920 },
+              height: { ideal: 1080 },
+              advanced: [
+                { focusMode: "continuous" },
+                { exposureMode: "continuous" },
+                { whiteBalanceMode: "continuous" },
+              ],
+            },
+          });
+        } catch {
+          // fallback sem constraints avançadas (iOS Safari, browsers antigos)
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+          });
+        }
 
         if (!ativo) { stream.getTracks().forEach((t) => t.stop()); return; }
 
