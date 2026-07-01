@@ -1,28 +1,45 @@
 import { useMemo, useState } from "react";
-import { TrendingDown, TrendingUp, History as HistoryIcon, ChevronRight } from "lucide-react";
+import { TrendingDown, TrendingUp, History as HistoryIcon, ChevronRight, Trash2 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
-import Button from "../components/ui/Button";
 import ReceiptModal from "../components/layout/ReceiptModal";
 import { useApp } from "../context/AppContext";
 import { HISTORICO, HOJE_MOCK } from "../mock/data";
 import { inferirCategoria } from "../utils/categorizar";
-import { useNavigate } from "react-router-dom";
 
 const MES_ATUAL_PREFIXO = HOJE_MOCK.slice(0, 7);
 const MES_ATUAL_LABEL = "Junho 2026";
 
+function BotaoApagar({ onConfirmar }) {
+  const [confirmando, setConfirmando] = useState(false);
+  return confirmando ? (
+    <button
+      onClick={(e) => { e.stopPropagation(); onConfirmar(); }}
+      onMouseLeave={() => setConfirmando(false)}
+      className="flex shrink-0 items-center gap-1 rounded-full bg-rose-500 px-2.5 py-1 text-xs font-semibold text-cream-50 cursor-pointer"
+    >
+      <Trash2 className="h-3 w-3" /> Confirmar?
+    </button>
+  ) : (
+    <button
+      onClick={(e) => { e.stopPropagation(); setConfirmando(true); }}
+      className="shrink-0 cursor-pointer rounded-full p-1.5 text-ink-300 hover:bg-rose-100/60 hover:text-rose-600"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  );
+}
+
 export default function History() {
-  const { historicoPrecos, gastoMes, orcamento } = useApp();
-  const navigate = useNavigate();
+  const { historicoPrecos, gastoMes, orcamento, mesesApagados, apagarMesHistorico } = useApp();
   const [mesSelecionado, setMesSelecionado] = useState(null);
 
-  // entrada real do mês atual — derivada do que foi realmente comprado via Modo Mercado
   const mesAtual = useMemo(() => {
     const doMes = historicoPrecos.filter((r) => r.data.startsWith(MES_ATUAL_PREFIXO));
     if (doMes.length === 0) return null;
     return {
       mes: MES_ATUAL_LABEL,
+      prefixo: MES_ATUAL_PREFIXO,
       total: gastoMes,
       orcamento,
       itens: doMes.reduce((s, r) => s + (r.quantidade ?? 1), 0),
@@ -35,9 +52,8 @@ export default function History() {
     };
   }, [historicoPrecos, gastoMes, orcamento]);
 
-  // meses passados estáticos (demo seed) + mês atual em tempo real no topo
-  const todoHistorico = mesAtual ? [mesAtual, ...HISTORICO] : HISTORICO;
-  const visiveis = todoHistorico;
+  const historicoFiltrado = HISTORICO.filter((m) => !mesesApagados.includes(m.mes));
+  const todoHistorico = mesAtual ? [mesAtual, ...historicoFiltrado] : historicoFiltrado;
   const maiorGasto = todoHistorico.length > 0 ? Math.max(...todoHistorico.map((h) => h.total)) : 0;
 
   if (todoHistorico.length === 0) {
@@ -63,7 +79,7 @@ export default function History() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
-        {visiveis.map((mes, i) => {
+        {todoHistorico.map((mes, i) => {
           const dentroOrcamento = mes.total <= mes.orcamento;
           const pctBarra = maiorGasto > 0 ? (mes.total / maiorGasto) * 100 : 0;
           const ehMesAtual = mes.mes === MES_ATUAL_LABEL && mesAtual !== null;
@@ -78,13 +94,12 @@ export default function History() {
               style={{ animationDelay: `${i * 50}ms` }}
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2.5">
                     <p className="font-display text-lg font-semibold text-ink-900">{mes.mes}</p>
-                    {ehMesAtual && (
+                    {ehMesAtual ? (
                       <Badge tone="forest" dot>em andamento</Badge>
-                    )}
-                    {!ehMesAtual && (
+                    ) : (
                       <Badge tone={dentroOrcamento ? "forest" : "rose"}>
                         {dentroOrcamento ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
                         {dentroOrcamento ? "dentro do orçamento" : "acima do orçamento"}
@@ -99,17 +114,19 @@ export default function History() {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <p className="font-mono text-xl font-semibold text-ink-900">
                     R$ {mes.total.toFixed(2).replace(".", ",")}
                   </p>
+                  <BotaoApagar
+                    onConfirmar={() => apagarMesHistorico(mes.mes, mes.prefixo ?? null)}
+                  />
                   <ChevronRight className="h-4 w-4 text-ink-300" />
                 </div>
               </div>
             </Card>
           );
         })}
-
       </div>
 
       {mesSelecionado && <ReceiptModal mes={mesSelecionado} onFechar={() => setMesSelecionado(null)} />}

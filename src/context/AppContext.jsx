@@ -34,6 +34,8 @@ export function AppProvider({ children }) {
   const [mercados, setMercados]                     = usarEstadoPersistido("listamo:mercados", MERCADOS_CONHECIDOS);
   const [mercadoAtual, setMercadoAtual]             = usarEstadoPersistido("listamo:mercadoAtual", MERCADOS_CONHECIDOS[0]);
   const [historicoPrecos, setHistoricoPrecos]       = usarEstadoPersistido("listamo:historicoPrecos", HISTORICO_PRECOS);
+  const [mesesApagados, setMesesApagados]           = usarEstadoPersistido("listamo:mesesApagados", []);
+  const [boasVindasPremium, setBoasVindasPremium]   = usarEstadoPersistido("listamo:boasVindas", false);
   const [despensa, setDespensaLocal]                = usarEstadoPersistido("listamo:despensa", DESPENSA);
   const [faixasIdade, setFaixasIdade]               = usarEstadoPersistido("listamo:faixasIdade", USUARIO.perfilCasa.faixasIdade.map(normalizarMorador));
   const [restricoesAlimentares, setRestricoesAlimentares] = usarEstadoPersistido("listamo:restricoes", USUARIO.perfilCasa.restricoes);
@@ -78,6 +80,16 @@ export function AppProvider({ children }) {
     ]);
     return total;
   }
+  function apagarMesHistorico(labelMes, prefixoMes) {
+    if (prefixoMes) {
+      // mês real — remove entradas do historicoPrecos
+      setHistoricoPrecos((prev) => prev.filter((r) => !r.data.startsWith(prefixoMes)));
+    } else {
+      // mês seed — adiciona à lista de apagados
+      setMesesApagados((prev) => prev.includes(labelMes) ? prev : [...prev, labelMes]);
+    }
+  }
+
   function adicionarMercado(nomeBruto) {
     const novo = nomeBruto.trim();
     if (!novo) return;
@@ -124,6 +136,8 @@ export function AppProvider({ children }) {
       orcamento, setOrcamento,
       listas, criarLista, atualizarItensLista, renomearLista, excluirLista,
       gastoMes, finalizarCompra,
+      mesesApagados, apagarMesHistorico,
+      boasVindasPremium, setBoasVindasPremium,
       mercados, mercadoAtual, setMercadoAtual, adicionarMercado,
       resetarDadosDemo,
       historicoPrecos,

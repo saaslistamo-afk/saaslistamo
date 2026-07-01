@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Crown, Medal, ShoppingBasket, Sparkles } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
+import BoasVindasPremium from "../components/ui/BoasVindasPremium";
 import { PLANOS } from "../mock/data";
 import { useApp } from "../context/AppContext";
 
@@ -12,9 +14,18 @@ const ESTILO_PREMIUM = {
 };
 
 export default function PlanSelect() {
-  const { plano: planoAtual, setPlano, usuario } = useApp();
+  const { plano: planoAtual, setPlano, usuario, boasVindasPremium, setBoasVindasPremium } = useApp();
   const navigate = useNavigate();
+  const [mostrarBoasVindas, setMostrarBoasVindas] = useState(false);
   const trialAindaAtivo = planoAtual === "trial" && usuario.trialDiasRestantes > 0;
+
+  function assinar() {
+    setPlano("premium");
+    if (!boasVindasPremium) {
+      setMostrarBoasVindas(true);
+      setBoasVindasPremium(true);
+    }
+  }
 
   if (planoAtual === "premium") {
     return (
@@ -87,7 +98,7 @@ export default function PlanSelect() {
             ))}
           </ul>
 
-          <Button variant="primary" size="lg" className="mt-7 w-full" onClick={() => setPlano("premium")}>
+          <Button variant="primary" size="lg" className="mt-7 w-full" onClick={assinar}>
             Assinar Premium <Crown className="h-4 w-4" />
           </Button>
         </Card>
@@ -96,6 +107,10 @@ export default function PlanSelect() {
       <p className="animate-rise mt-8 text-center text-xs text-ink-400" style={{ animationDelay: "160ms" }}>
         Pagamento processado com segurança via Cakto · Pix, cartão ou boleto
       </p>
+
+      {mostrarBoasVindas && (
+        <BoasVindasPremium onFechar={() => { setMostrarBoasVindas(false); navigate("/dashboard"); }} />
+      )}
     </div>
   );
 }
