@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Plus, X, Archive, ScanLine, ShoppingBasket, Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState, lazy, Suspense } from "react";
+import { Plus, X, Archive, ScanLine, Pencil, Trash2 } from "lucide-react";
+const BarcodeScanner = lazy(() => import("../components/ui/BarcodeScanner"));
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -18,20 +19,6 @@ const FILTROS = [
 
 const HOJE = new Date(HOJE_MOCK);
 
-const PRODUTOS_ESCANEAVEIS = [
-  { nome: "Requeijão cremoso", validadeDias: 25 },
-  { nome: "Presunto fatiado", validadeDias: 10 },
-  { nome: "Iogurte grego", validadeDias: 15 },
-  { nome: "Macarrão instantâneo", validadeDias: 180 },
-  { nome: "Achocolatado em pó", validadeDias: 200 },
-  { nome: "Suco concentrado", validadeDias: 60 },
-];
-
-function dataEmDias(dias) {
-  const d = new Date(HOJE);
-  d.setDate(d.getDate() + dias);
-  return d.toISOString().slice(0, 10);
-}
 
 const STATUS_INFO = {
   vencido: { tone: "rose", label: "Vencido", anel: "ring-rose-500/40" },
@@ -117,14 +104,13 @@ export default function Pantry() {
     fecharModal();
   }
 
-  function simularEscaneamento() {
-    const produto = PRODUTOS_ESCANEAVEIS[Math.floor(Math.random() * PRODUTOS_ESCANEAVEIS.length)];
+  function aoReceberProdutoEscaneado({ nome }) {
+    setScannerAberto(false);
     setEditandoId(null);
-    setNovoNome(produto.nome);
-    setNovaValidade(dataEmDias(produto.validadeDias));
+    setNovoNome(nome || "");
+    setNovaValidade("");
     setNovaQuantidade(1);
     setViaScanner(true);
-    setScannerAberto(false);
     setModalAberto(true);
   }
 
@@ -286,22 +272,12 @@ export default function Pantry() {
       )}
 
       {scannerAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 backdrop-blur-sm">
-          <Card className="relative w-full max-w-sm overflow-hidden p-6 text-center">
-            <button onClick={() => setScannerAberto(false)} className="absolute right-4 top-4 cursor-pointer text-ink-400 hover:text-ink-700">
-              <X className="h-5 w-5" />
-            </button>
-            <div className="mx-auto flex h-40 w-full items-center justify-center rounded-2xl bg-ink-900">
-              <div className="relative h-20 w-3/4 overflow-hidden rounded-lg border-2 border-forest-500/50">
-                <div className="absolute inset-x-0 top-1/2 h-0.5 animate-pulse-soft bg-terracotta-400" />
-                <ShoppingBasket className="absolute inset-0 m-auto h-7 w-7 text-cream-50/30" />
-              </div>
-            </div>
-            <p className="mt-4 font-display text-lg font-semibold text-ink-900">Aponte para o código de barras</p>
-            <p className="mt-1 text-sm text-ink-500">A gente preenche o produto, você confere a validade.</p>
-            <Button className="mt-5 w-full" onClick={simularEscaneamento}>Simular leitura</Button>
-          </Card>
-        </div>
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            onScan={aoReceberProdutoEscaneado}
+            onCancelar={() => setScannerAberto(false)}
+          />
+        </Suspense>
       )}
     </div>
   );
