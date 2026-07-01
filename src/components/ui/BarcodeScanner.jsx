@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { X, Loader } from "lucide-react";
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from "@zxing/library";
+import { X, Loader, Zap, ZapOff } from "lucide-react";
 import Button from "./Button";
 
-// consulta o Open Food Facts pra descobrir o nome do produto pelo código de barras
+const HINTS = new Map([
+  [DecodeHintType.TRY_HARDER, true],
+  [DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.QR_CODE,
+  ]],
+]);
+
 async function buscarProduto(codigo) {
   try {
     const res = await fetch(
@@ -13,11 +25,7 @@ async function buscarProduto(codigo) {
     const data = await res.json();
     if (data.status !== 1) return null;
     const p = data.product;
-    const nome =
-      p.product_name_pt ||
-      p.product_name ||
-      p.product_name_en ||
-      null;
+    const nome = p.product_name_pt || p.product_name || p.product_name_en || null;
     return nome ? { nome: nome.trim(), codigo } : null;
   } catch {
     return null;
@@ -26,36 +34,69 @@ async function buscarProduto(codigo) {
 
 export default function BarcodeScanner({ onScan, onCancelar }) {
   const videoRef    = useRef(null);
+  const streamRef   = useRef(null);
   const controlsRef = useRef(null);
-  const [etapa, setEtapa]     = useState("camera"); // "camera" | "buscando" | "nao_encontrado"
-  const [erro, setErro]       = useState("");
+  const [etapa, setEtapa]           = useState("camera");
+  const [erro, setErro]             = useState("");
   const [codigoLido, setCodigoLido] = useState("");
+  const [lanterna, setLanterna]     = useState(false);
+  const [temLanterna, setTemLanterna] = useState(false);
+
+  async function toggleLanterna() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !lanterna }] });
+      setLanterna((v) => !v);
+    } catch {}
+  }
 
   useEffect(() => {
     let ativo = true;
-    const reader = new BrowserMultiFormatReader();
+    const reader = new BrowserMultiFormatReader(HINTS, 300); // tenta a cada 300ms
 
     async function iniciar() {
       try {
-        const controls = await reader.decodeFromVideoDevice(
-          undefined, // câmera traseira por padrão em mobile
-          videoRef.current,
-          async (result, err) => {
-            if (!result || !ativo) return;
-            // barcode detectado — para a câmera e busca o produto
-            controls.stop();
-            const codigo = result.getText();
-            setCodigoLido(codigo);
-            setEtapa("buscando");
-            const produto = await buscarProduto(codigo);
-            if (!ativo) return;
-            if (produto) {
-              onScan(produto); // { nome, codigo }
-            } else {
-              setEtapa("nao_encontrado");
-            }
+        // pede stream com foco contínuo e resolução alta
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width:  { ideal: 1920 },
+            height: { ideal: 1080 },
+            advanced: [
+              { focusMode: "continuous" },
+              { exposureMode: "continuous" },
+              { whiteBalanceMode: "continuous" },
+            ],
+          },
+        });
+
+        if (!ativo) { stream.getTracks().forEach((t) => t.stop()); return; }
+
+        streamRef.current = stream;
+        videoRef.current.srcObject = stream;
+
+        // verifica se a lanterna está disponível
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities?.() ?? {};
+        setTemLanterna(!!capabilities.torch);
+
+        const controls = await reader.decodeFromStream(stream, videoRef.current, async (result, err) => {
+          if (!result || !ativo) return;
+          controls.stop();
+          stream.getTracks().forEach((t) => t.stop());
+          const codigo = result.getText();
+          setCodigoLido(codigo);
+          setEtapa("buscando");
+          const produto = await buscarProduto(codigo);
+          if (!ativo) return;
+          if (produto) {
+            onScan(produto);
+          } else {
+            setEtapa("nao_encontrado");
           }
-        );
+        });
+
         if (ativo) controlsRef.current = controls;
       } catch (e) {
         if (!ativo) return;
@@ -71,12 +112,12 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
     return () => {
       ativo = false;
       controlsRef.current?.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink-900">
-      {/* vídeo da câmera */}
       <div className="relative flex-1 overflow-hidden">
         <video
           ref={videoRef}
@@ -86,32 +127,28 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
           playsInline
         />
 
-        {/* mira de leitura */}
+        {/* mira */}
         {etapa === "camera" && !erro && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="relative h-56 w-72">
-              {/* cantos da mira */}
+            <div className="relative h-52 w-72">
               <span className="absolute left-0 top-0 h-8 w-8 border-l-4 border-t-4 border-forest-400 rounded-tl-lg" />
               <span className="absolute right-0 top-0 h-8 w-8 border-r-4 border-t-4 border-forest-400 rounded-tr-lg" />
               <span className="absolute bottom-0 left-0 h-8 w-8 border-b-4 border-l-4 border-forest-400 rounded-bl-lg" />
               <span className="absolute bottom-0 right-0 h-8 w-8 border-b-4 border-r-4 border-forest-400 rounded-br-lg" />
-              {/* linha de leitura */}
               <span className="absolute inset-x-4 top-1/2 h-0.5 -translate-y-1/2 animate-pulse-soft bg-terracotta-400" />
             </div>
-            <p className="absolute bottom-24 left-0 right-0 text-center text-sm font-medium text-cream-50/80">
-              Aponte para o código de barras do produto
+            <p className="absolute bottom-28 left-0 right-0 text-center text-sm font-medium text-cream-50/80 px-6">
+              Mantenha o código de barras dentro da moldura
             </p>
           </div>
         )}
 
-        {/* erro de câmera */}
         {erro && (
           <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
             <p className="text-sm text-cream-50/80">{erro}</p>
           </div>
         )}
 
-        {/* buscando produto */}
         {etapa === "buscando" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink-900/80">
             <Loader className="h-8 w-8 animate-spin text-forest-400" />
@@ -120,30 +157,40 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
           </div>
         )}
 
-        {/* produto não encontrado na base */}
         {etapa === "nao_encontrado" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink-900/80 px-8 text-center">
-            <p className="font-display text-lg font-semibold text-cream-50">
-              Produto não identificado
-            </p>
+            <p className="font-display text-lg font-semibold text-cream-50">Produto não identificado</p>
             <p className="text-sm text-cream-50/70">
-              Código <span className="font-mono text-cream-50/90">{codigoLido}</span> não encontrado na base. Adicione o nome manualmente.
+              Código <span className="font-mono text-cream-50/90">{codigoLido}</span> não encontrado. Adicione o nome manualmente.
             </p>
             <div className="flex gap-3">
-              <Button variant="outline" className="border-cream-50/20 text-cream-50 hover:bg-cream-50/10" onClick={() => {
-                setEtapa("camera");
-                // reinicia o scanner
-                const reader = new BrowserMultiFormatReader();
-                reader.decodeFromVideoDevice(undefined, videoRef.current, async (result) => {
-                  if (!result) return;
-                  const codigo = result.getText();
-                  setCodigoLido(codigo);
-                  setEtapa("buscando");
-                  const produto = await buscarProduto(codigo);
-                  if (produto) onScan(produto);
-                  else setEtapa("nao_encontrado");
-                }).then(c => { controlsRef.current = c; });
-              }}>
+              <Button
+                variant="outline"
+                className="border-cream-50/20 text-cream-50 hover:bg-cream-50/10"
+                onClick={() => {
+                  setEtapa("camera");
+                  const reader = new BrowserMultiFormatReader(HINTS, 300);
+                  navigator.mediaDevices.getUserMedia({
+                    video: {
+                      facingMode: { ideal: "environment" },
+                      width: { ideal: 1920 }, height: { ideal: 1080 },
+                      advanced: [{ focusMode: "continuous" }],
+                    },
+                  }).then((stream) => {
+                    streamRef.current = stream;
+                    videoRef.current.srcObject = stream;
+                    reader.decodeFromStream(stream, videoRef.current, async (result) => {
+                      if (!result) return;
+                      const codigo = result.getText();
+                      setCodigoLido(codigo);
+                      setEtapa("buscando");
+                      const produto = await buscarProduto(codigo);
+                      if (produto) onScan(produto);
+                      else setEtapa("nao_encontrado");
+                    }).then(c => { controlsRef.current = c; });
+                  });
+                }}
+              >
                 Tentar novamente
               </Button>
               <Button onClick={() => onScan({ nome: "", codigo: codigoLido })}>
@@ -152,9 +199,21 @@ export default function BarcodeScanner({ onScan, onCancelar }) {
             </div>
           </div>
         )}
+
+        {/* botão de lanterna */}
+        {temLanterna && etapa === "camera" && (
+          <button
+            onClick={toggleLanterna}
+            className="absolute bottom-28 right-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-ink-900/60 text-cream-50 backdrop-blur-sm hover:bg-ink-900/80"
+          >
+            {lanterna
+              ? <ZapOff className="h-5 w-5" />
+              : <Zap className="h-5 w-5" />
+            }
+          </button>
+        )}
       </div>
 
-      {/* botão fechar */}
       <div className="flex items-center justify-center bg-ink-900 p-6">
         <button
           onClick={onCancelar}
