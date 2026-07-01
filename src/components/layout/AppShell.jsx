@@ -3,8 +3,10 @@ import {
   LayoutDashboard, ListPlus, ShoppingCart, Archive, History, UserRound,
   Lock, X, Scale, ChevronDown,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
+import { useWebPush } from "../../hooks/useWebPush";
+import { statusValidade } from "../../mock/data";
 import Badge from "../ui/Badge";
 import logoName from "../../assets/logo-name.png";
 import logoNameDark from "../../assets/logo-name-dark.png";
@@ -27,12 +29,43 @@ function iniciais(nome) {
 }
 
 export default function AppShell({ children }) {
-  const { usuario, plano, setPlano, isPremium, trialBannerVisivel, setTrialBannerVisivel, fotoPerfil, darkMode } = useApp();
+  const { usuario, plano, setPlano, isPremium, trialAtivo, trialBannerVisivel, setTrialBannerVisivel, fotoPerfil, darkMode, notificacoes, despensa, orcamento, gastoMes } = useApp();
+  const { notificarLocal } = useWebPush();
   const navigate = useNavigate();
   const [menuPlanoAberto, setMenuPlanoAberto] = useState(false);
   const [painelPerfilAberto, setPainelPerfilAberto] = useState(false);
 
-  const trialAtivo = plano === "trial";
+  // verifica condições locais e mostra notificações quando o app abre
+  useEffect(() => {
+    if (Notification.permission !== "granted") return;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const ultimaVerif = localStorage.getItem("listamo:ultimaVerifNotif");
+    if (ultimaVerif === hoje) return; // só verifica uma vez por dia
+    localStorage.setItem("listamo:ultimaVerifNotif", hoje);
+
+    if (notificacoes.validade) {
+      const criticos = despensa.filter((d) => {
+        const s = statusValidade(d.dataValidade);
+        return s === "vencendo" || s === "vencido";
+      });
+      if (criticos.length > 0) {
+        notificarLocal(
+          "Atenção na despensa!",
+          `${criticos.length} ${criticos.length === 1 ? "item está" : "itens estão"} vencendo ou vencidos. Confira agora.`,
+          "/despensa"
+        );
+      }
+    }
+
+    if (notificacoes.orcamento && orcamento > 0 && gastoMes >= orcamento * 0.8) {
+      notificarLocal(
+        "Orçamento quase no limite",
+        `Você já usou ${Math.round((gastoMes / orcamento) * 100)}% do orçamento do mês.`,
+        "/dashboard"
+      );
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex">

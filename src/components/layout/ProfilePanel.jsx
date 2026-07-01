@@ -5,6 +5,7 @@ import Button from "../ui/Button";
 import Switch from "../ui/Switch";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
+import { useWebPush } from "../../hooks/useWebPush";
 
 function iniciais(nome) {
   return nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
@@ -17,6 +18,7 @@ export default function ProfilePanel({ aberto, onFechar }) {
     nome, setNome, email, setEmail, notificacoes, setNotificacoes,
   } = useApp();
   const { sair } = useAuth();
+  const { solicitarPermissao, cancelarSubscription } = useWebPush();
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
@@ -44,8 +46,14 @@ export default function ProfilePanel({ aberto, onFechar }) {
     navigate("/login");
   }
 
-  function atualizarNotif(chave, valor) {
+  async function atualizarNotif(chave, valor) {
     setNotificacoes((prev) => ({ ...prev, [chave]: valor }));
+    if (valor) {
+      await solicitarPermissao();
+    } else {
+      const algumAtivo = Object.entries(notificacoes).some(([k, v]) => k !== chave && v);
+      if (!algumAtivo) await cancelarSubscription();
+    }
   }
 
   return (
