@@ -2,37 +2,19 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, KeyRound, Eye, EyeOff, ArrowRight, Carrot, Croissant, Milk, ShoppingBasket } from "lucide-react";
 import Button from "../components/ui/Button";
-import { useApp } from "../context/AppContext";
-import { useAuth } from "../context/AuthContext";
 import logoNova from "../assets/logo-nova.png";
 import logoMark from "../assets/logo-mark.png";
 
 export default function Login() {
-  const [modo, setModo] = useState("entrar"); // "entrar" | "criar"
+  const [modo, setModo] = useState("entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [verSenha, setVerSenha] = useState(false);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState("");
-  const { entrar, cadastrar } = useAuth();
   const navigate = useNavigate();
 
-  async function aoEnviar(e) {
+  function aoEnviar(e) {
     e.preventDefault();
-    setErro("");
-    setCarregando(true);
-    try {
-      if (modo === "entrar") {
-        await entrar(email, senha);
-      } else {
-        await cadastrar(email, senha);
-      }
-      navigate("/dashboard");
-    } catch (err) {
-      setErro(traduzirErro(err.code));
-    } finally {
-      setCarregando(false);
-    }
+    navigate("/dashboard");
   }
 
   return (
@@ -109,7 +91,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="voce@email.com"
-                  required
+
                   className="w-full bg-transparent text-sm text-ink-900 outline-none placeholder:text-ink-400"
                 />
               </span>
@@ -124,8 +106,8 @@ export default function Login() {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   placeholder="••••••••"
-                  required
-                  minLength={6}
+
+
                   className="w-full bg-transparent text-sm text-ink-900 outline-none placeholder:text-ink-400"
                 />
                 <button type="button" onClick={() => setVerSenha((v) => !v)} className="cursor-pointer text-ink-400 hover:text-ink-600">
@@ -134,20 +116,16 @@ export default function Login() {
               </span>
             </label>
 
-            {erro && (
-              <p className="rounded-lg bg-rose-100 px-3.5 py-2.5 text-sm font-medium text-rose-600">{erro}</p>
-            )}
-
-            <Button type="submit" size="lg" className="mt-2 w-full justify-between" disabled={carregando}>
-              {carregando ? "Aguarde..." : modo === "entrar" ? "Entrar" : "Criar minha conta"}
-              {!carregando && <ArrowRight className="h-4 w-4" />}
+            <Button type="submit" size="lg" className="mt-2 w-full justify-between">
+              {modo === "entrar" ? "Entrar" : "Criar minha conta"}
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-ink-600">
             {modo === "entrar" ? "Ainda não tem conta?" : "Já tem uma conta?"}{" "}
             <button
-              onClick={() => { setModo(modo === "entrar" ? "criar" : "entrar"); setErro(""); }}
+              onClick={() => setModo(modo === "entrar" ? "criar" : "entrar")}
               className="cursor-pointer font-semibold text-terracotta-600 hover:text-terracotta-700"
             >
               {modo === "entrar" ? "Criar conta gratuita" : "Entrar"}
@@ -160,16 +138,3 @@ export default function Login() {
   );
 }
 
-function traduzirErro(code) {
-  const mensagens = {
-    "auth/invalid-credential":      "E-mail ou senha incorretos.",
-    "auth/user-not-found":          "Nenhuma conta com esse e-mail.",
-    "auth/wrong-password":          "Senha incorreta.",
-    "auth/email-already-in-use":    "Esse e-mail já tem uma conta. Tente entrar.",
-    "auth/weak-password":           "Senha muito fraca — use ao menos 6 caracteres.",
-    "auth/invalid-email":           "E-mail inválido.",
-    "auth/too-many-requests":       "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
-    "auth/network-request-failed":  "Sem conexão. Verifique sua internet.",
-  };
-  return mensagens[code] ?? "Algo deu errado. Tente novamente.";
-}
