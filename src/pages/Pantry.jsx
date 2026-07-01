@@ -79,7 +79,7 @@ export default function Pantry() {
   }
 
   function salvarItem() {
-    if (!novoNome.trim() || !novaValidade) return;
+    if (!novoNome.trim()) return;
     const quantidade = Number(novaQuantidade) || 1;
     if (editandoId) {
       editarItemDespensa(editandoId, {
@@ -108,7 +108,10 @@ export default function Pantry() {
     setScannerAberto(false);
     setEditandoId(null);
     setNovoNome(nome || "");
-    setNovaValidade("");
+    // pré-preenche com 30 dias à frente — usuário pode ajustar
+    const daqui30 = new Date(HOJE);
+    daqui30.setDate(daqui30.getDate() + 30);
+    setNovaValidade(daqui30.toISOString().slice(0, 10));
     setNovaQuantidade(1);
     setViaScanner(true);
     setModalAberto(true);
