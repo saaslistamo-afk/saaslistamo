@@ -10,13 +10,13 @@ import ComparePrices from "./pages/ComparePrices";
 import History from "./pages/History";
 import HouseholdProfile from "./pages/HouseholdProfile";
 import { useAuth } from "./context/AuthContext";
-import { useApp } from "./context/AppContext";
 
 function RotaPrivada({ children }) {
   const { usuario } = useAuth();
-  const { carregando } = useApp();
 
-  if (usuario === undefined || (usuario && carregando)) {
+  // só aguarda o Firebase Auth resolver (rápido) — dados do Firestore
+  // carregam em segundo plano enquanto o app já está visível
+  if (usuario === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-cream-100">
         <div className="flex flex-col items-center gap-3">
