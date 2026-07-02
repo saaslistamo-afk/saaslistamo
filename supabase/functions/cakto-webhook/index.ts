@@ -33,9 +33,9 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json();
 
-    const email    = payload.customer?.email ?? payload.email;
+    const email    = payload.data?.customer?.email ?? payload.customer?.email ?? payload.email;
     const evento   = payload.event ?? payload.type ?? "";
-    const compraId = payload.id ?? payload.order_id ?? payload.sale_id ?? null;
+    const compraId = payload.data?.id ?? payload.id ?? null;
 
     if (!email) {
       return new Response(JSON.stringify({ error: "email ausente no payload" }), { status: 400 });
