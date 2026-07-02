@@ -63,7 +63,7 @@ export function AuthProvider({ children }) {
 
   async function recuperarSenha(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: "https://listamoapp.vercel.app/redefinir-senha",
     });
     if (error) throw error;
   }
