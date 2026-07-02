@@ -27,20 +27,20 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user ?? null;
-      const userFinal = user ? await verificarEPromover(user) : null;
-      setUsuario(userFinal);
+      setUsuario(user);
+      setCarregandoAuth(false);
+      if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
+    }).catch(() => {
       setCarregandoAuth(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const user = session?.user ?? null;
+      setUsuario(user);
       if (user && event === "SIGNED_IN") {
-        const userFinal = await verificarEPromover(user);
-        setUsuario(userFinal);
-      } else {
-        setUsuario(user);
+        verificarEPromover(user).then(setUsuario).catch(() => {});
       }
     });
 
