@@ -7,16 +7,41 @@ export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [carregandoAuth, setCarregandoAuth] = useState(true);
 
+  // Verifica tabela assinaturas e promove para premium se encontrar registro
+  async function verificarEPromover(user) {
+    if (!user || user.user_metadata?.plano === "premium") return user;
+
+    const { data } = await supabase
+      .from("assinaturas")
+      .select("plano")
+      .eq("email", user.email)
+      .single();
+
+    if (data?.plano === "premium") {
+      const { data: atualizado } = await supabase.auth.updateUser({
+        data: { plano: "premium" },
+      });
+      return atualizado?.user ?? user;
+    }
+    return user;
+  }
+
   useEffect(() => {
-    // pega a sessão atual (instantâneo, sem request de rede)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUsuario(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const user = session?.user ?? null;
+      const userFinal = user ? await verificarEPromover(user) : null;
+      setUsuario(userFinal);
       setCarregandoAuth(false);
     });
 
-    // ouve mudanças de sessão (login, logout, refresh de token)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUsuario(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const user = session?.user ?? null;
+      if (user && event === "SIGNED_IN") {
+        const userFinal = await verificarEPromover(user);
+        setUsuario(userFinal);
+      } else {
+        setUsuario(user);
+      }
     });
 
     return () => subscription.unsubscribe();

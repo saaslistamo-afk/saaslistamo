@@ -13,49 +13,35 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json();
 
-    // Cakto envia os dados do cliente no payload
-    // Adapte os campos conforme o webhook real do Cakto
-    const email = payload.customer?.email || payload.email;
-    const nome  = payload.customer?.name  || payload.name || "";
+    const email     = payload.customer?.email ?? payload.email;
+    const compraId  = payload.id ?? payload.order_id ?? payload.sale_id ?? null;
 
     if (!email) {
-      return new Response("Email não encontrado no payload", { status: 400 });
+      return new Response(JSON.stringify({ error: "email ausente no payload" }), { status: 400 });
     }
 
-    // Tenta criar o usuário no Supabase Auth
-    const { data, error } = await supabase.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: { nome, plano: "premium" },
-      // gera uma senha temporária — o usuário vai redefinir via email
-      password: crypto.randomUUID(),
-    });
+    // Salva (ou atualiza) a assinatura pelo email
+    const { error } = await supabase
+      .from("assinaturas")
+      .upsert({ email, plano: "premium", compra_id: compraId }, { onConflict: "email" });
 
-    if (error && error.message.includes("already been registered")) {
-      // usuário já existe — atualiza para premium
-      const { data: users } = await supabase.auth.admin.listUsers();
-      const existente = users.users.find((u) => u.email === email);
-      if (existente) {
-        await supabase.auth.admin.updateUserById(existente.id, {
-          user_metadata: { ...existente.user_metadata, plano: "premium" },
-        });
-      }
-    } else if (error) {
-      throw error;
+    if (error) throw error;
+
+    // Se o usuário já existe no Supabase, promove agora mesmo
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const existente = users?.users.find((u) => u.email === email);
+    if (existente) {
+      await supabase.auth.admin.updateUserById(existente.id, {
+        user_metadata: { ...existente.user_metadata, plano: "premium" },
+      });
     }
-
-    // Envia email de redefinição de senha para o cliente criar sua própria senha
-    await supabase.auth.admin.generateLink({
-      type: "recovery",
-      email,
-    });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("Erro no webhook:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
