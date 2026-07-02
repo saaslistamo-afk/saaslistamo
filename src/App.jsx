@@ -5,7 +5,9 @@ import Login from "./pages/Login";
 import { useAuth } from "./context/AuthContext";
 import { useApp } from "./context/AppContext";
 
+const LandingPage      = lazy(() => import("./pages/LandingPage"));
 const Dashboard        = lazy(() => import("./pages/Dashboard"));
+const ResetPassword    = lazy(() => import("./pages/ResetPassword"));
 const PlanSelect       = lazy(() => import("./pages/PlanSelect"));
 const NewList          = lazy(() => import("./pages/NewList"));
 const MarketMode       = lazy(() => import("./pages/MarketMode"));
@@ -38,8 +40,9 @@ export default function App() {
   return (
     <Suspense fallback={null}>
       <Routes>
-        <Route path="/"                element={<Navigate to="/login" replace />} />
+        <Route path="/"                element={<LandingPage />} />
         <Route path="/login"           element={<RotaPublica><Login /></RotaPublica>} />
+        <Route path="/redefinir-senha" element={<ResetPassword />} />
         <Route path="/planos"          element={<RotaPrivada exigeAssinatura={false}><PlanSelect /></RotaPrivada>} />
         <Route path="/dashboard"       element={<RotaPrivada><ComShell><Dashboard /></ComShell></RotaPrivada>} />
         <Route path="/nova-lista"      element={<RotaPrivada><ComShell><NewList /></ComShell></RotaPrivada>} />
