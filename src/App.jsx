@@ -6,6 +6,14 @@ import { useAuth } from "./context/AuthContext";
 import { useApp } from "./context/AppContext";
 import { supabase } from "./lib/supabase";
 
+function Carregando() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-paper">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-900/10 border-t-forest-600" />
+    </div>
+  );
+}
+
 const Dashboard        = lazy(() => import("./pages/Dashboard"));
 const ResetPassword    = lazy(() => import("./pages/ResetPassword"));
 const PlanSelect       = lazy(() => import("./pages/PlanSelect"));
@@ -19,7 +27,7 @@ const HouseholdProfile = lazy(() => import("./pages/HouseholdProfile"));
 function RotaPrivada({ children, exigeAssinatura = true }) {
   const { usuario, carregandoAuth } = useAuth();
   const { isPremium } = useApp();
-  if (carregandoAuth) return null;
+  if (carregandoAuth) return <Carregando />;
   if (!usuario) return <Navigate to="/login" replace />;
   if (exigeAssinatura && !isPremium) return <Navigate to="/planos" replace />;
   return children;
@@ -27,7 +35,7 @@ function RotaPrivada({ children, exigeAssinatura = true }) {
 
 function RotaPublica({ children }) {
   const { usuario, carregandoAuth } = useAuth();
-  if (carregandoAuth) return null;
+  if (carregandoAuth) return <Carregando />;
   if (usuario) return <Navigate to="/dashboard" replace />;
   return children;
 }
@@ -49,7 +57,7 @@ export default function App() {
   }, [navigate]);
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Carregando />}>
       <Routes>
         <Route path="/"                element={<Navigate to="/login" replace />} />
         <Route path="/login"           element={<RotaPublica><Login /></RotaPublica>} />

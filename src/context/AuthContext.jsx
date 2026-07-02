@@ -27,24 +27,34 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    // Garante que carregandoAuth vira false mesmo se getSession travar
+    const fallback = setTimeout(() => setCarregandoAuth(false), 3000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(fallback);
       const user = session?.user ?? null;
       setUsuario(user);
       setCarregandoAuth(false);
       if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
     }).catch(() => {
+      clearTimeout(fallback);
       setCarregandoAuth(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const user = session?.user ?? null;
       setUsuario(user);
-      if (user && event === "SIGNED_IN") {
-        verificarEPromover(user).then(setUsuario).catch(() => {});
+      // INITIAL_SESSION é o primeiro evento ao subscrever — desbloqueia a UI imediatamente
+      if (event === "INITIAL_SESSION") {
+        clearTimeout(fallback);
+        setCarregandoAuth(false);
+        if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
+      } else if (event === "SIGNED_IN") {
+        if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(fallback); subscription.unsubscribe(); };
   }, []);
 
   async function entrar(email, senha) {
