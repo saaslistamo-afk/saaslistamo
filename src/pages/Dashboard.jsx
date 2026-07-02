@@ -12,7 +12,7 @@ import BudgetJar from "../components/ui/BudgetJar";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
 import { useApp } from "../context/AppContext";
-import { HISTORICO, CATEGORIAS, statusValidade, diasParaVencer } from "../mock/data";
+import { CATEGORIAS, statusValidade, diasParaVencer } from "../mock/data";
 import { gastoPorCategoria, itensEsquecidos } from "../utils/precos";
 import scanBg from "../assets/scan-bg.png";
 
@@ -33,8 +33,8 @@ export default function Dashboard() {
   const listaAtiva = listas[0];
   const itensLista = listaAtiva?.itens ?? [];
   const noCarrinho = itensLista.filter((i) => i.status === "carrinho").length;
-  const mesAnterior = HISTORICO[0];
-  const variacao = mesAnterior ? ((gastoMes - mesAnterior.total) / mesAnterior.total) * 100 : null;
+  const mesAnterior = null;
+  const variacao = null;
 
   const despensaCritica = despensa
     .map((d) => ({ ...d, status: statusValidade(d.dataValidade), dias: diasParaVencer(d.dataValidade) }))

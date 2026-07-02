@@ -5,6 +5,26 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+async function encontrarUsuario(email: string) {
+  const { data } = await supabase.auth.admin.listUsers();
+  return data?.users.find((u) => u.email === email) ?? null;
+}
+
+async function atualizarPlanoUsuario(email: string, plano: string) {
+  // Atualiza tabela assinaturas
+  await supabase
+    .from("assinaturas")
+    .upsert({ email, plano }, { onConflict: "email" });
+
+  // Se usuário já existe no Supabase, atualiza metadata também
+  const existente = await encontrarUsuario(email);
+  if (existente) {
+    await supabase.auth.admin.updateUserById(existente.id, {
+      user_metadata: { ...existente.user_metadata, plano },
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -13,30 +33,30 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json();
 
-    const email     = payload.customer?.email ?? payload.email;
-    const compraId  = payload.id ?? payload.order_id ?? payload.sale_id ?? null;
+    const email    = payload.customer?.email ?? payload.email;
+    const evento   = payload.event ?? payload.type ?? "";
+    const compraId = payload.id ?? payload.order_id ?? payload.sale_id ?? null;
 
     if (!email) {
       return new Response(JSON.stringify({ error: "email ausente no payload" }), { status: 400 });
     }
 
-    // Salva (ou atualiza) a assinatura pelo email
-    const { error } = await supabase
-      .from("assinaturas")
-      .upsert({ email, plano: "premium", compra_id: compraId }, { onConflict: "email" });
+    const eventosAprovacao = ["compra_aprovada", "purchase_approved", "sale_approved", "order_paid"];
+    const eventosRevogacao = ["reembolso", "refund", "chargeback", "estorno", "cancelamento", "subscription_cancelled"];
 
-    if (error) throw error;
-
-    // Se o usuário já existe no Supabase, promove agora mesmo
-    const { data: users } = await supabase.auth.admin.listUsers();
-    const existente = users?.users.find((u) => u.email === email);
-    if (existente) {
-      await supabase.auth.admin.updateUserById(existente.id, {
-        user_metadata: { ...existente.user_metadata, plano: "premium" },
-      });
+    if (eventosAprovacao.some((e) => evento.toLowerCase().includes(e)) || evento === "") {
+      // Compra aprovada → promove para premium
+      await atualizarPlanoUsuario(email, "premium");
+      console.log(`[webhook] premium ativado: ${email} (compra: ${compraId})`);
+    } else if (eventosRevogacao.some((e) => evento.toLowerCase().includes(e))) {
+      // Reembolso/chargeback → revoga acesso
+      await atualizarPlanoUsuario(email, "revogado");
+      console.log(`[webhook] acesso revogado: ${email} (evento: ${evento})`);
+    } else {
+      console.log(`[webhook] evento ignorado: ${evento} para ${email}`);
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, evento, email }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
