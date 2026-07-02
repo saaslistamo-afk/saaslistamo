@@ -1,9 +1,10 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
 import AppShell from "./components/layout/AppShell";
 import Login from "./pages/Login";
 import { useAuth } from "./context/AuthContext";
 import { useApp } from "./context/AppContext";
+import { supabase } from "./lib/supabase";
 
 const Dashboard        = lazy(() => import("./pages/Dashboard"));
 const ResetPassword    = lazy(() => import("./pages/ResetPassword"));
@@ -36,6 +37,17 @@ function ComShell({ children }) {
 }
 
 export default function App() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        navigate("/redefinir-senha");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
   return (
     <Suspense fallback={null}>
       <Routes>
