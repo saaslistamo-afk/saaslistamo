@@ -120,8 +120,8 @@ export default function ProfilePanel({ aberto, onFechar }) {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-ink-900/10 bg-paper px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-forest-500 focus:ring-2 focus:ring-forest-500/15"
+                readOnly
+                className="w-full rounded-xl border border-ink-900/10 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-500 outline-none cursor-default"
               />
             </label>
           </div>

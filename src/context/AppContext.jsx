@@ -71,10 +71,10 @@ export function AppProvider({ children }) {
     }
     setSincronizado(false);
 
-    // Preenche nome/email do auth se ainda não foram definidos
+    // Email sempre vem do auth; nome usa o da conta se não há customização
+    setEmail(usuario.email || "");
     const nomeAuth = usuario.user_metadata?.nome ?? usuario.email?.split("@")[0] ?? "";
     setNome((prev) => prev || nomeAuth);
-    setEmail((prev) => prev || usuario.email || "");
 
     supabase
       .from("dados_usuario")
