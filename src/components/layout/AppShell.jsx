@@ -37,7 +37,7 @@ export default function AppShell({ children }) {
 
   // verifica condições locais e mostra notificações quando o app abre
   useEffect(() => {
-    if (Notification.permission !== "granted") return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
 
     const hoje = new Date().toISOString().slice(0, 10);
     const ultimaVerif = localStorage.getItem("listamo:ultimaVerifNotif");

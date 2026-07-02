@@ -54,7 +54,7 @@ export function useWebPush() {
   }, []);
 
   const notificarLocal = useCallback(async (title, body, url = "/dashboard") => {
-    if (!("serviceWorker" in navigator) || Notification.permission !== "granted") return;
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || Notification.permission !== "granted") return;
     const reg = await navigator.serviceWorker.ready;
     await reg.showNotification(title, {
       body,
