@@ -53,8 +53,9 @@ export function AuthProvider({ children }) {
   }
 
   async function cadastrar(email, senha) {
-    const { error } = await supabase.auth.signUp({ email, password: senha });
+    const { data, error } = await supabase.auth.signUp({ email, password: senha });
     if (error) throw error;
+    return { confirmacaoPendente: !data.session };
   }
 
   async function sair() {

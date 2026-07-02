@@ -25,10 +25,16 @@ export default function Login() {
     try {
       if (modo === "entrar") {
         await entrar(email, senha);
+        navigate("/dashboard");
       } else {
-        await cadastrar(email, senha);
+        const { confirmacaoPendente } = await cadastrar(email, senha);
+        if (confirmacaoPendente) {
+          setMsgRecuperacao("Verifique seu e-mail para ativar a conta e depois entre aqui.");
+        } else {
+          setMsgRecuperacao("Conta criada! Entrando...");
+          // RotaPublica redireciona automaticamente quando a sessão é estabelecida
+        }
       }
-      navigate("/dashboard");
     } catch (err) {
       setErro(traduzirErro(err.message));
     } finally {
@@ -170,7 +176,7 @@ export default function Login() {
           <p className="mt-6 text-center text-sm text-ink-600">
             {modo === "entrar" ? "Ainda não tem conta?" : "Já tem uma conta?"}{" "}
             <button
-              onClick={() => setModo(modo === "entrar" ? "criar" : "entrar")}
+              onClick={() => { setModo(modo === "entrar" ? "criar" : "entrar"); setErro(""); setMsgRecuperacao(""); }}
               className="cursor-pointer font-semibold text-terracotta-600 hover:text-terracotta-700"
             >
               {modo === "entrar" ? "Criar conta gratuita" : "Entrar"}
