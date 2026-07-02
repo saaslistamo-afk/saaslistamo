@@ -14,17 +14,13 @@ const ESTILO_PREMIUM = {
 };
 
 export default function PlanSelect() {
-  const { plano: planoAtual, setPlano, usuario, boasVindasPremium, setBoasVindasPremium } = useApp();
+  const { plano: planoAtual, usuario } = useApp();
   const navigate = useNavigate();
   const [mostrarBoasVindas, setMostrarBoasVindas] = useState(false);
   const trialAindaAtivo = planoAtual === "trial" && usuario.trialDiasRestantes > 0;
 
   function assinar() {
-    setPlano("premium");
-    if (!boasVindasPremium) {
-      setMostrarBoasVindas(true);
-      setBoasVindasPremium(true);
-    }
+    window.location.href = "https://pay.cakto.com.br/ngkivkg_953027";
   }
 
   if (planoAtual === "premium") {

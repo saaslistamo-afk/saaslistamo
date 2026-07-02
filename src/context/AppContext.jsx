@@ -188,7 +188,8 @@ export function AppProvider({ children }) {
     const isPremium = plano === "premium" || (plano === "trial" && trialAtivo);
     return {
       usuario: { nome, email, trialDiasRestantes, perfilCasa: { faixasIdade, restricoes: restricoesAlimentares } },
-      plano, setPlano,
+      plano,
+      setPlano: import.meta.env.DEV ? setPlano : undefined,
       isPremium,
       trialAtivo,
       isEssencialOuMais: isPremium,
