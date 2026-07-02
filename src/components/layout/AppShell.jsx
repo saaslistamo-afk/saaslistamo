@@ -126,7 +126,7 @@ export default function AppShell({ children }) {
           </div>
         </header>
 
-        {trialAtivo && trialBannerVisivel && (
+        {plano === "trial" && trialAtivo && trialBannerVisivel && (
           <div className="flex items-center justify-between gap-3 bg-terracotta-500 px-4 py-2.5 text-sm text-cream-50 lg:px-8">
             <p>
               <strong className="font-semibold">
