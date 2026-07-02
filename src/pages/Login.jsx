@@ -13,7 +13,9 @@ export default function Login() {
   const [verSenha, setVerSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
-  const { entrar, cadastrar } = useAuth();
+  const [recuperando, setRecuperando] = useState(false);
+  const [msgRecuperacao, setMsgRecuperacao] = useState("");
+  const { entrar, cadastrar, recuperarSenha } = useAuth();
   const navigate = useNavigate();
 
   async function aoEnviar(e) {
@@ -136,11 +138,33 @@ export default function Login() {
             {erro && (
               <p className="rounded-lg bg-rose-100 px-3.5 py-2.5 text-sm font-medium text-rose-600">{erro}</p>
             )}
+            {msgRecuperacao && (
+              <p className="rounded-lg bg-forest-100 px-3.5 py-2.5 text-sm font-medium text-forest-700">{msgRecuperacao}</p>
+            )}
 
             <Button type="submit" size="lg" className="mt-2 w-full justify-between" disabled={carregando}>
               {carregando ? "Aguarde..." : modo === "entrar" ? "Entrar" : "Criar minha conta"}
               {!carregando && <ArrowRight className="h-4 w-4" />}
             </Button>
+
+            {modo === "entrar" && (
+              <button
+                type="button"
+                disabled={recuperando}
+                onClick={async () => {
+                  if (!email) { setErro("Digite seu e-mail para recuperar a senha."); return; }
+                  setRecuperando(true); setErro("");
+                  try {
+                    await recuperarSenha(email);
+                    setMsgRecuperacao("E-mail de recuperação enviado! Verifique sua caixa de entrada.");
+                  } catch { setErro("Não foi possível enviar o e-mail. Tente novamente."); }
+                  finally { setRecuperando(false); }
+                }}
+                className="cursor-pointer text-center text-sm text-ink-500 hover:text-terracotta-600"
+              >
+                {recuperando ? "Enviando..." : "Esqueci minha senha"}
+              </button>
+            )}
           </form>
 
           <p className="mt-6 text-center text-sm text-ink-600">
