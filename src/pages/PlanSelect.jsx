@@ -6,6 +6,7 @@ import Card from "../components/ui/Card";
 import BoasVindasPremium from "../components/ui/BoasVindasPremium";
 import { PLANOS } from "../mock/data";
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 
 const ESTILO_PREMIUM = {
   barra: "from-ouro-300 via-ouro-600 to-ouro-300",
@@ -15,12 +16,25 @@ const ESTILO_PREMIUM = {
 
 export default function PlanSelect() {
   const { plano: planoAtual, usuario } = useApp();
+  const { carregandoPlano } = useAuth();
   const navigate = useNavigate();
   const [mostrarBoasVindas, setMostrarBoasVindas] = useState(false);
   const trialAindaAtivo = planoAtual === "trial" && usuario.trialDiasRestantes > 0;
 
   function assinar() {
     window.location.href = "https://pay.cakto.com.br/ngkivkg_953027";
+  }
+
+  // Essa é a única tela que fica visível pra quem não é premium (RotaPrivada
+  // não redireciona daqui), então é a única que também precisa esperar
+  // carregandoPlano por conta própria — senão mostra "assine agora" por um
+  // instante pra quem já é premium, antes do plano real chegar.
+  if (carregandoPlano) {
+    return (
+      <div className="flex min-h-[calc(100vh-2rem)] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-900/10 border-t-forest-600" />
+      </div>
+    );
   }
 
   if (planoAtual === "premium") {

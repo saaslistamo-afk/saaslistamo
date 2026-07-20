@@ -25,10 +25,14 @@ const History          = lazy(() => import("./pages/History"));
 const HouseholdProfile = lazy(() => import("./pages/HouseholdProfile"));
 
 function RotaPrivada({ children, exigeAssinatura = true }) {
-  const { usuario, carregandoAuth } = useAuth();
+  const { usuario, carregandoAuth, carregandoPlano } = useAuth();
   const { isPremium } = useApp();
   if (carregandoAuth) return <Carregando />;
   if (!usuario) return <Navigate to="/login" replace />;
+  // Espera o plano carregar antes de decidir o redirecionamento — senão
+  // isPremium ainda está no valor inicial (false) e manda pra /planos por
+  // engano mesmo pra quem já é premium, num piscar de olhos no reload.
+  if (exigeAssinatura && carregandoPlano) return <Carregando />;
   if (exigeAssinatura && !isPremium) return <Navigate to="/planos" replace />;
   return children;
 }

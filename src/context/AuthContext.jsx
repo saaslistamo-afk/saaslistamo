@@ -5,40 +5,52 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
+  const [planoAssinatura, setPlanoAssinatura] = useState(null);
   const [carregandoAuth, setCarregandoAuth] = useState(true);
+  // Separado de carregandoAuth: a sessão resolve antes do plano (busca
+  // assíncrona à parte). Sem isso, RotaPrivada via `isPremium` ainda `false`
+  // no primeiro render pós-login e manda o usuário pra /planos por engano,
+  // mesmo já sendo premium — sempre esperar os dois antes de decidir a rota.
+  const [carregandoPlano, setCarregandoPlano] = useState(true);
 
-  // Verifica tabela assinaturas e promove para premium se encontrar registro
-  async function verificarEPromover(user) {
-    if (!user || user.user_metadata?.plano === "premium") return user;
-
+  // Busca o plano na tabela `assinaturas` (fonte de verdade, só-leitura para o
+  // próprio usuário via RLS — só a service role do webhook grava nela).
+  // Importante: nunca gravar o plano em user_metadata. Esse campo é editável
+  // pelo próprio usuário via supabase.auth.updateUser(), então usá-lo para
+  // liberar acesso premium é burlável no console do navegador.
+  async function buscarPlanoAssinatura(user) {
+    if (!user) return null;
     const { data } = await supabase
       .from("assinaturas")
       .select("plano")
       .eq("email", user.email)
       .single();
-
-    if (data?.plano === "premium") {
-      const { data: atualizado } = await supabase.auth.updateUser({
-        data: { plano: "premium" },
-      });
-      return atualizado?.user ?? user;
-    }
-    return user;
+    return data?.plano ?? null;
   }
 
   useEffect(() => {
     // Garante que carregandoAuth vira false mesmo se getSession travar
     const fallback = setTimeout(() => setCarregandoAuth(false), 3000);
 
+    function carregarPlano(user) {
+      if (!user) { setCarregandoPlano(false); return; }
+      setCarregandoPlano(true);
+      buscarPlanoAssinatura(user)
+        .then(setPlanoAssinatura)
+        .catch(() => {})
+        .finally(() => setCarregandoPlano(false));
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(fallback);
       const user = session?.user ?? null;
       setUsuario(user);
       setCarregandoAuth(false);
-      if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
+      carregarPlano(user);
     }).catch(() => {
       clearTimeout(fallback);
       setCarregandoAuth(false);
+      setCarregandoPlano(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -48,9 +60,12 @@ export function AuthProvider({ children }) {
       if (event === "INITIAL_SESSION") {
         clearTimeout(fallback);
         setCarregandoAuth(false);
-        if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
+        carregarPlano(user);
       } else if (event === "SIGNED_IN") {
-        if (user) verificarEPromover(user).then(setUsuario).catch(() => {});
+        carregarPlano(user);
+      } else if (event === "SIGNED_OUT") {
+        setPlanoAssinatura(null);
+        setCarregandoPlano(false);
       }
     });
 
@@ -80,7 +95,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, carregandoAuth, entrar, cadastrar, sair, recuperarSenha }}>
+    <AuthContext.Provider value={{ usuario, planoAssinatura, carregandoAuth, carregandoPlano, entrar, cadastrar, sair, recuperarSenha }}>
       {children}
     </AuthContext.Provider>
   );

@@ -30,15 +30,17 @@ function normalizarMorador(item) {
 }
 
 export function AppProvider({ children }) {
-  const { usuario } = useAuth();
-  const [plano, setPlano] = useState("trial");
+  const { usuario, planoAssinatura } = useAuth();
+  // Override só pro seletor "Visualizando como" (DEV). Em produção fica
+  // sempre null e o plano efetivo vem 100% de planoAssinatura — derivado
+  // direto no useMemo abaixo, sem passar por useState+useEffect: copiar
+  // planoAssinatura pra um state à parte atrasa `isPremium` em um ciclo de
+  // render (o efeito só roda depois do primeiro render com o valor novo),
+  // o que fazia RotaPrivada redirecionar pra /planos por engano logo após
+  // o carregandoPlano virar false, mesmo já sabendo que o plano é premium.
+  const [overridePlanoDev, setOverridePlanoDev] = useState(null);
   const [sincronizado, setSincronizado] = useState(false);
   const saveTimerRef = useRef(null);
-
-  useEffect(() => {
-    const planoDaMetadata = usuario?.user_metadata?.plano;
-    setPlano(planoDaMetadata ?? "trial");
-  }, [usuario]);
 
   const [trialBannerVisivel, setTrialBannerVisivel] = usarEstadoPersistido("listamo:trialBanner", true);
   const [orcamento, setOrcamento]                   = usarEstadoPersistido("listamo:orcamento", 0);
@@ -185,11 +187,12 @@ export function AppProvider({ children }) {
       : 0;
     const trialDiasRestantes = Math.max(0, 3 - diasUsados);
     const trialAtivo = trialDiasRestantes > 0;
+    const plano = overridePlanoDev ?? planoAssinatura ?? "trial";
     const isPremium = plano === "premium" || (plano === "trial" && trialAtivo);
     return {
       usuario: { nome, email, trialDiasRestantes, perfilCasa: { faixasIdade, restricoes: restricoesAlimentares } },
       plano,
-      setPlano: import.meta.env.DEV ? setPlano : undefined,
+      setPlano: import.meta.env.DEV ? setOverridePlanoDev : undefined,
       isPremium,
       trialAtivo,
       isEssencialOuMais: isPremium,
@@ -211,7 +214,7 @@ export function AppProvider({ children }) {
       notificacoes, setNotificacoes,
     };
   }, [
-    usuario, plano, trialBannerVisivel, orcamento, listas, gastoMes,
+    usuario, planoAssinatura, overridePlanoDev, trialBannerVisivel, orcamento, listas, gastoMes,
     mercados, mercadoAtual, historicoPrecos, despensa,
     faixasIdade, restricoesAlimentares, darkMode, fotoPerfil, nome, email, notificacoes,
     mesesApagados, boasVindasPremium,

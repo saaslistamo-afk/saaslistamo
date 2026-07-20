@@ -2,13 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ListPlus, ShoppingCart, ScanLine, Archive, TrendingDown, TrendingUp,
-  AlertTriangle, CircleAlert, ArrowRight,
+  AlertTriangle, CircleAlert, ArrowRight, Pencil, MoreHorizontal, Plus,
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import ScanButton from "../components/ui/ScanButton";
-import BudgetJar from "../components/ui/BudgetJar";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
 import { useApp } from "../context/AppContext";
@@ -71,61 +70,98 @@ export default function Dashboard() {
         {isPremium && <QuickAction icon={ScanLine} label="Escanear" onClick={() => navigate("/modo-mercado")} imagemFundo={scanBg} />}
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-3">
-        {/* Orçamento */}
-        <Card className="animate-rise p-6 lg:order-last" style={{ animationDelay: "60ms" }}>
-          <BudgetJar gasto={gastoMes} orcamento={orcamento} size={104} onEditar={() => setEditandoOrcamento(true)} />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {/* Orçamento — painel em destaque */}
+        <div
+          className="animate-rise relative isolate flex min-h-[13.5rem] flex-col overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-forest-600 via-forest-700 to-forest-950 p-6 text-cream-50 shadow-lift"
+          style={{ animationDelay: "60ms" }}
+        >
+          <span className="paper-grain absolute inset-0 opacity-30" />
+          <div className="relative z-10 flex items-start justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-cream-50/70">Orçamento do mês</p>
+            <button
+              onClick={() => setEditandoOrcamento(true)}
+              aria-label="Editar orçamento do mês"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-cream-50/15 text-cream-50 transition-colors hover:bg-cream-50/25"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="relative z-10 mt-auto flex items-end gap-4">
+            <CapsulaProgresso pct={orcamento > 0 ? gastoMes / orcamento : 0} />
+            <div className="min-w-0">
+              <p className="font-bebas text-[2.75rem] leading-none tracking-wide">{formatBRL(gastoMes)}</p>
+              <p className="mt-1.5 truncate text-sm text-cream-50/80">
+                de {formatBRL(orcamento)} ·{" "}
+                {orcamento - gastoMes < 0
+                  ? `${formatBRL(Math.abs(orcamento - gastoMes))} acima`
+                  : `${formatBRL(orcamento - gastoMes)} livres`}
+              </p>
+            </div>
+          </div>
           {mesAnterior && (
-            <div className="mt-5 flex items-center gap-2 rounded-lg bg-cream-100 px-3 py-2 text-xs font-medium text-ink-600">
-              {variacao <= 0 ? <TrendingDown className="h-4 w-4 text-forest-600" /> : <TrendingUp className="h-4 w-4 text-terracotta-600" />}
+            <div className="relative z-10 mt-4 flex items-center gap-2 rounded-lg bg-cream-50/10 px-3 py-2 text-xs font-medium text-cream-50/90">
+              {variacao <= 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
               {Math.abs(variacao).toFixed(0)}% {variacao <= 0 ? "menor" : "maior"} que {mesAnterior.mes}
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Lista ativa */}
-        <Card className="animate-rise p-6 lg:col-span-2 lg:order-first" style={{ animationDelay: "120ms" }}>
+        {/* Lista ativa — painel em destaque */}
+        <div
+          className="animate-rise relative isolate flex min-h-[13.5rem] flex-col overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-terracotta-500 via-terracotta-600 to-terracotta-700 p-6 text-cream-50 shadow-lift"
+          style={{ animationDelay: "110ms" }}
+        >
+          <span className="paper-grain absolute inset-0 opacity-30" />
           {listaAtiva ? (
             <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div className="relative z-10 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Lista mais recente</p>
-                  <h2 className="truncate font-display text-xl font-semibold text-ink-900" title={listaAtiva.nome}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-cream-50/70">Lista mais recente</p>
+                  <h2 className="mt-0.5 truncate font-display text-xl font-semibold" title={listaAtiva.nome}>
                     {listaAtiva.nome}
                   </h2>
                 </div>
-                <Badge tone="forest" className="shrink-0 self-start sm:self-auto">{noCarrinho} de {itensLista.length} no carrinho</Badge>
+                <button
+                  onClick={() => navigate("/nova-lista")}
+                  aria-label="Ver todas as listas"
+                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-cream-50/15 text-cream-50 transition-colors hover:bg-cream-50/25"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {Object.keys(CATEGORIAS).slice(0, 6).map((cat) => {
-                  const count = itensLista.filter((i) => i.categoria === cat).length;
-                  if (!count) return null;
-                  return (
-                    <span key={cat} className="flex items-center gap-1.5 rounded-full bg-cream-100 px-2.5 py-1 text-xs font-medium text-ink-600">
-                      <CategoryIcon categoria={cat} size="sm" /> {CATEGORIAS[cat].label} · {count}
-                    </span>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button onClick={() => navigate("/nova-lista")}>Ver suas listas</Button>
-                <Button variant="outline" className="whitespace-nowrap" onClick={() => navigate("/modo-mercado")}>
-                  Ir para o modo mercado <ArrowRight className="h-4 w-4" />
-                </Button>
+              <div className="relative z-10 mt-auto flex items-end justify-between gap-3">
+                <div>
+                  <p className="font-bebas text-[2.75rem] leading-none tracking-wide">
+                    {noCarrinho}
+                    <span className="text-2xl text-cream-50/70">/{itensLista.length}</span>
+                  </p>
+                  <p className="mt-1.5 text-sm text-cream-50/80">itens no carrinho</p>
+                </div>
+                <button
+                  onClick={() => navigate("/modo-mercado")}
+                  aria-label="Ir para o modo mercado"
+                  className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-cream-50 text-terracotta-700 shadow-soft transition-transform duration-200 active:scale-95"
+                >
+                  <ArrowRight className="h-5 w-5" />
+                </button>
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-start">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Nenhuma lista ainda</p>
-              <p className="mt-1 text-ink-600">Comece uma lista de compras pra ver o resumo aqui.</p>
-              <Button className="mt-4" onClick={() => navigate("/nova-lista")}>
-                <ListPlus className="h-4 w-4" /> Começar lista
-              </Button>
+            <div className="relative z-10 flex h-full flex-col items-start justify-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-cream-50/70">Nenhuma lista ainda</p>
+              <p className="mt-1.5 max-w-[16rem] text-cream-50/90">Comece uma lista de compras pra ver o resumo aqui.</p>
+              <button
+                onClick={() => navigate("/nova-lista")}
+                className="mt-4 flex cursor-pointer items-center gap-2 rounded-full bg-cream-50 px-4 py-2.5 text-sm font-semibold text-terracotta-700 shadow-soft transition-transform duration-200 active:scale-95"
+              >
+                <Plus className="h-4 w-4" /> Começar lista
+              </button>
             </div>
           )}
-        </Card>
+        </div>
       </div>
 
       {isPremium && (
@@ -220,6 +256,18 @@ export default function Dashboard() {
           onFechar={() => setEditandoOrcamento(false)}
         />
       )}
+    </div>
+  );
+}
+
+function CapsulaProgresso({ pct }) {
+  const cheio = Math.min(Math.max(pct, 0), 1) * 100;
+  return (
+    <div className="relative h-28 w-9 shrink-0 overflow-hidden rounded-full bg-cream-50/15">
+      <div
+        className="absolute inset-x-0 bottom-0 rounded-full bg-cream-50/85 transition-[height] duration-700 ease-out"
+        style={{ height: `${cheio}%` }}
+      />
     </div>
   );
 }
