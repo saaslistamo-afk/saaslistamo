@@ -35,6 +35,89 @@ function uint8ArrayToBase64url(arr: Uint8Array): string {
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
+function concatBytes(...partes: Uint8Array[]): Uint8Array {
+  const total = partes.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const p of partes) { out.set(p, offset); offset += p.length; }
+  return out;
+}
+
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, tamanho: number): Promise<Uint8Array> {
+  const chave = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info },
+    chave,
+    tamanho * 8
+  );
+  return new Uint8Array(bits);
+}
+
+// Criptografia do payload conforme RFC 8291 (Message Encryption for Web
+// Push) — sem isso, qualquer serviço de push real (Apple, Google, Mozilla)
+// rejeita a requisição com 400 "BadWebPushRequest" assim que o corpo não
+// está vazio, mesmo com a assinatura VAPID correta.
+async function criptografarPayload(
+  payloadBytes: Uint8Array,
+  p256dhB64: string,
+  authB64: string
+): Promise<Uint8Array> {
+  const uaPublicBytes = base64urlToUint8Array(p256dhB64); // ponto EC não-comprimido do assinante (65 bytes)
+  const authSecret = base64urlToUint8Array(authB64);
+
+  const uaPublicKey = await crypto.subtle.importKey(
+    "raw", uaPublicBytes, { name: "ECDH", namedCurve: "P-256" }, true, []
+  );
+
+  const asKeyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]
+  ) as CryptoKeyPair;
+  const asPublicBytes = new Uint8Array(await crypto.subtle.exportKey("raw", asKeyPair.publicKey));
+
+  const segredoCompartilhado = new Uint8Array(
+    await crypto.subtle.deriveBits({ name: "ECDH", public: uaPublicKey }, asKeyPair.privateKey, 256)
+  );
+
+  const textoWebPushInfo = new TextEncoder().encode("WebPush: info\0");
+  const keyInfo = concatBytes(textoWebPushInfo, uaPublicBytes, asPublicBytes);
+  const ikm = await hkdf(authSecret, segredoCompartilhado, keyInfo, 32);
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, new TextEncoder().encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(salt, ikm, new TextEncoder().encode("Content-Encoding: nonce\0"), 12);
+
+  const cekKey = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  // delimitador 0x02 = último (e único) registro, conforme RFC 8188
+  const textoClaro = concatBytes(payloadBytes, new Uint8Array([2]));
+  const cifrado = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, cekKey, textoClaro)
+  );
+
+  const recordSize = new Uint8Array(4);
+  new DataView(recordSize.buffer).setUint32(0, 4096);
+  const cabecalho = concatBytes(salt, recordSize, new Uint8Array([asPublicBytes.length]), asPublicBytes);
+
+  return concatBytes(cabecalho, cifrado);
+}
+
+// Formato "raw" do WebCrypto só existe para chave PÚBLICA de curva elíptica
+// (o ponto não-comprimido: 0x04 + x + y). Chave privada precisa ir como JWK
+// — por isso construímos o JWK a partir do "d" (escalar privado, já temos)
+// e do x/y (extraídos da própria chave pública, que também já temos).
+async function importarChavePrivada(): Promise<CryptoKey> {
+  const pubBytes = base64urlToUint8Array(VAPID_PUBLIC_KEY); // 0x04 + x(32) + y(32)
+  const x = uint8ArrayToBase64url(pubBytes.slice(1, 33));
+  const y = uint8ArrayToBase64url(pubBytes.slice(33, 65));
+
+  return crypto.subtle.importKey(
+    "jwk",
+    { kty: "EC", crv: "P-256", d: VAPID_PRIVATE_KEY, x, y, ext: true },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+}
+
 async function gerarJWT(sub: string): Promise<string> {
   const header  = { alg: "ES256", typ: "JWT" };
   const payload = { aud: new URL(sub).origin, exp: Math.floor(Date.now() / 1000) + 3600, sub: VAPID_SUBJECT };
@@ -44,12 +127,7 @@ async function gerarJWT(sub: string): Promise<string> {
 
   const unsigned = `${encode(header)}.${encode(payload)}`;
 
-  const privKeyBytes = base64urlToUint8Array(VAPID_PRIVATE_KEY);
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw", privKeyBytes,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false, ["sign"]
-  );
+  const cryptoKey = await importarChavePrivada();
   const sig = await crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" },
     cryptoKey,
@@ -58,19 +136,23 @@ async function gerarJWT(sub: string): Promise<string> {
   return `${unsigned}.${uint8ArrayToBase64url(new Uint8Array(sig))}`;
 }
 
-async function enviarPush(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: object): Promise<number> {
+async function enviarPush(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: object): Promise<{ status: number; corpo: string }> {
   const jwt = await gerarJWT(subscription.endpoint);
+  const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
+  const corpoCifrado = await criptografarPayload(payloadBytes, subscription.keys.p256dh, subscription.keys.auth);
 
   const res = await fetch(subscription.endpoint, {
     method: "POST",
     headers: {
       "Authorization": `vapid t=${jwt},k=${VAPID_PUBLIC_KEY}`,
-      "Content-Type": "application/json",
+      "Content-Encoding": "aes128gcm",
+      "Content-Type": "application/octet-stream",
       "TTL": "86400",
     },
-    body: JSON.stringify(payload),
+    body: corpoCifrado,
   });
-  return res.status;
+  const corpo = await res.text().catch(() => "");
+  return { status: res.status, corpo };
 }
 
 // Mesma regra de src/mock/data.js (statusValidade): vencido = já passou,
@@ -171,7 +253,7 @@ Deno.serve(async (req) => {
       let subscriptionExpirada = false;
 
       for (const notif of notificacoes) {
-        const status = await enviarPush(sub, notif);
+        const { status } = await enviarPush(sub, notif);
         if (status === 410 || status === 404) {
           subscriptionExpirada = true;
           break;
