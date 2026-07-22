@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import {
-  Plus, Trash2, ScanLine, FileDown, Sparkle, X, ShoppingBasket, Pencil, Check, Scale, Tag,
-  ChevronRight, ListPlus, ArrowLeft,
+  Plus, Trash2, ScanLine, FileDown, Sparkle, Pencil, Check, Scale, Tag,
+  ChevronRight, ListPlus, ArrowLeft, ShoppingCart,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -146,6 +147,7 @@ function BotaoExcluirLista({ nome, onConfirmar }) {
 
 function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcluirLista, comecarRenomeando = false }) {
   const { isPremium, orcamento, setOrcamento, historicoPrecos, faixasIdade, restricoesAlimentares } = useApp();
+  const navigate = useNavigate();
   const itens = lista.itens;
   const [nome, setNome] = useState("");
   const [quantidade, setQuantidade] = useState(1);
@@ -210,8 +212,58 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
     }
   }
 
-  function exportarPDF() {
-    setMensagem("PDF gerado — pronto para compartilhar no WhatsApp.");
+  async function exportarPDF() {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    const esquerda = 15;
+    const direita = 195;
+    let y = 20;
+
+    doc.setFont(undefined, "bold");
+    doc.setFontSize(18);
+    doc.text(lista.nome, esquerda, y);
+    y += 7;
+
+    doc.setFont(undefined, "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(130);
+    doc.text(`Lista de compras · ${new Date().toLocaleDateString("pt-BR")}`, esquerda, y);
+    y += 6;
+    doc.setDrawColor(220);
+    doc.line(esquerda, y, direita, y);
+    y += 8;
+    doc.setTextColor(20);
+
+    agrupados.forEach(([categoria, listaItens]) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      doc.setFont(undefined, "bold");
+      doc.setFontSize(11);
+      doc.text(CATEGORIAS[categoria]?.label ?? categoria, esquerda, y);
+      y += 6;
+
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(10);
+      listaItens.forEach((item) => {
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(`${item.quantidade}x  ${item.nome}`, esquerda + 2, y);
+        doc.text(formatBRL(item.preco * item.quantidade), direita, y, { align: "right" });
+        y += 6;
+      });
+      y += 3;
+    });
+
+    if (y > 270) { doc.addPage(); y = 20; }
+    y += 2;
+    doc.setDrawColor(220);
+    doc.line(esquerda, y, direita, y);
+    y += 9;
+    doc.setFont(undefined, "bold");
+    doc.setFontSize(13);
+    doc.text("Total", esquerda, y);
+    doc.text(formatBRL(total), direita, y, { align: "right" });
+
+    doc.save(`${lista.nome.trim().replace(/[^\w-]+/g, "_") || "lista"}.pdf`);
+    setMensagem("PDF gerado e baixado — pronto para compartilhar no WhatsApp.");
     setTimeout(() => setMensagem(""), 3000);
   }
 
@@ -275,6 +327,15 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
           {isPremium && (
             <Button variant="outline" size="sm" onClick={exportarPDF}>
               <FileDown className="h-4 w-4" /> Exportar PDF
+            </Button>
+          )}
+          {itens.length > 0 && (
+            <Button
+              variant="forest"
+              size="sm"
+              onClick={() => navigate("/modo-mercado", { state: { listaId: lista.id } })}
+            >
+              <ShoppingCart className="h-4 w-4" /> Ir às compras
             </Button>
           )}
         </div>

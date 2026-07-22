@@ -48,7 +48,6 @@ export function AppProvider({ children }) {
   const [mercados, setMercados]                     = usarEstadoPersistido("listamo:mercados", MERCADOS_CONHECIDOS);
   const [mercadoAtual, setMercadoAtual]             = usarEstadoPersistido("listamo:mercadoAtual", MERCADOS_CONHECIDOS[0]);
   const [historicoPrecos, setHistoricoPrecos]       = usarEstadoPersistido("listamo:historicoPrecos", []);
-  const [mesesApagados, setMesesApagados]           = usarEstadoPersistido("listamo:mesesApagados", []);
   const [boasVindasPremium, setBoasVindasPremium]   = usarEstadoPersistido("listamo:boasVindas", false);
   const [despensa, setDespensaLocal]                = usarEstadoPersistido("listamo:despensa", []);
   const [faixasIdade, setFaixasIdade]               = usarEstadoPersistido("listamo:faixasIdade", []);
@@ -150,12 +149,8 @@ export function AppProvider({ children }) {
     ]);
     return total;
   }
-  function apagarMesHistorico(labelMes, prefixoMes) {
-    if (prefixoMes) {
-      setHistoricoPrecos((prev) => prev.filter((r) => !r.data.startsWith(prefixoMes)));
-    } else {
-      setMesesApagados((prev) => prev.includes(labelMes) ? prev : [...prev, labelMes]);
-    }
+  function apagarMesHistorico(prefixoMes) {
+    setHistoricoPrecos((prev) => prev.filter((r) => !r.data.startsWith(prefixoMes)));
   }
 
   function adicionarMercado(nomeBruto) {
@@ -200,7 +195,7 @@ export function AppProvider({ children }) {
       orcamento, setOrcamento,
       listas, criarLista, atualizarItensLista, renomearLista, excluirLista,
       gastoMes, finalizarCompra,
-      mesesApagados, apagarMesHistorico,
+      apagarMesHistorico,
       boasVindasPremium, setBoasVindasPremium,
       mercados, mercadoAtual, setMercadoAtual, adicionarMercado,
       historicoPrecos,
@@ -217,7 +212,7 @@ export function AppProvider({ children }) {
     usuario, planoAssinatura, overridePlanoDev, trialBannerVisivel, orcamento, listas, gastoMes,
     mercados, mercadoAtual, historicoPrecos, despensa,
     faixasIdade, restricoesAlimentares, darkMode, fotoPerfil, nome, email, notificacoes,
-    mesesApagados, boasVindasPremium,
+    boasVindasPremium,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

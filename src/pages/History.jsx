@@ -4,13 +4,27 @@ import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import ReceiptModal from "../components/layout/ReceiptModal";
 import { useApp } from "../context/AppContext";
-import { HISTORICO } from "../mock/data";
 import { inferirCategoria } from "../utils/categorizar";
 
 const _hoje = new Date();
 const MES_ATUAL_PREFIXO = _hoje.toISOString().slice(0, 7);
 const MES_ATUAL_LABEL = _hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
   .replace(/^./, (c) => c.toUpperCase());
+
+function formatarLabelMes(prefixo) {
+  return new Date(`${prefixo}-01T12:00:00`)
+    .toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+function agruparPorProduto(registros) {
+  return registros.map((r) => ({
+    nome: r.produto,
+    quantidade: r.quantidade ?? 1,
+    preco: r.preco,
+    categoria: inferirCategoria(r.produto),
+  }));
+}
 
 function BotaoApagar({ onConfirmar }) {
   const [confirmando, setConfirmando] = useState(false);
@@ -33,7 +47,7 @@ function BotaoApagar({ onConfirmar }) {
 }
 
 export default function History() {
-  const { historicoPrecos, gastoMes, orcamento, mesesApagados, apagarMesHistorico } = useApp();
+  const { historicoPrecos, gastoMes, orcamento, apagarMesHistorico } = useApp();
   const [mesSelecionado, setMesSelecionado] = useState(null);
 
   const mesAtual = useMemo(() => {
@@ -45,17 +59,34 @@ export default function History() {
       total: gastoMes,
       orcamento,
       itens: doMes.reduce((s, r) => s + (r.quantidade ?? 1), 0),
-      produtos: doMes.map((r) => ({
-        nome: r.produto,
-        quantidade: r.quantidade ?? 1,
-        preco: r.preco,
-        categoria: inferirCategoria(r.produto),
-      })),
+      produtos: agruparPorProduto(doMes),
     };
   }, [historicoPrecos, gastoMes, orcamento]);
 
-  const historicoFiltrado = HISTORICO.filter((m) => !mesesApagados.includes(m.mes));
-  const todoHistorico = mesAtual ? [mesAtual, ...historicoFiltrado] : historicoFiltrado;
+  // Meses anteriores calculados a partir do histórico real de compras do
+  // usuário (nunca dados fictícios) — agrupa cada registro pelo mês/ano
+  // em que a compra foi finalizada.
+  const historicoAnterior = useMemo(() => {
+    const porMes = new Map();
+    for (const r of historicoPrecos) {
+      if (!r.data || r.data.startsWith(MES_ATUAL_PREFIXO)) continue;
+      const prefixo = r.data.slice(0, 7);
+      if (!porMes.has(prefixo)) porMes.set(prefixo, []);
+      porMes.get(prefixo).push(r);
+    }
+    return [...porMes.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([prefixo, registros]) => ({
+        mes: formatarLabelMes(prefixo),
+        prefixo,
+        total: registros.reduce((s, r) => s + r.preco * (r.quantidade ?? 1), 0),
+        orcamento,
+        itens: registros.reduce((s, r) => s + (r.quantidade ?? 1), 0),
+        produtos: agruparPorProduto(registros),
+      }));
+  }, [historicoPrecos, orcamento]);
+
+  const todoHistorico = mesAtual ? [mesAtual, ...historicoAnterior] : historicoAnterior;
   const maiorGasto = todoHistorico.length > 0 ? Math.max(...todoHistorico.map((h) => h.total)) : 0;
 
   if (todoHistorico.length === 0) {
@@ -97,17 +128,7 @@ export default function History() {
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5">
-                    <p className="font-display text-lg font-semibold text-ink-900">{mes.mes}</p>
-                    {ehMesAtual ? (
-                      <Badge tone="forest" dot>em andamento</Badge>
-                    ) : (
-                      <Badge tone={dentroOrcamento ? "forest" : "rose"}>
-                        {dentroOrcamento ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                        {dentroOrcamento ? "dentro do orçamento" : "acima do orçamento"}
-                      </Badge>
-                    )}
-                  </div>
+                  <p className="font-display text-lg font-semibold text-ink-900">{mes.mes}</p>
                   <p className="mt-1 text-sm text-ink-500">{mes.itens} itens comprados</p>
                   <div className="mt-3 h-2 w-full max-w-xs overflow-hidden rounded-full bg-cream-200">
                     <div
@@ -116,14 +137,24 @@ export default function History() {
                     />
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <p className="font-mono text-xl font-semibold text-ink-900">
-                    R$ {mes.total.toFixed(2).replace(".", ",")}
-                  </p>
-                  <BotaoApagar
-                    onConfirmar={() => apagarMesHistorico(mes.mes, mes.prefixo ?? null)}
-                  />
-                  <ChevronRight className="h-4 w-4 text-ink-300" />
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  {ehMesAtual ? (
+                    <Badge tone="forest" dot className="whitespace-nowrap">em andamento</Badge>
+                  ) : (
+                    <Badge tone={dentroOrcamento ? "forest" : "rose"} className="whitespace-nowrap">
+                      {dentroOrcamento ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                      {dentroOrcamento ? "dentro do orçamento" : "acima do orçamento"}
+                    </Badge>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-xl font-semibold text-ink-900">
+                      R$ {mes.total.toFixed(2).replace(".", ",")}
+                    </p>
+                    <BotaoApagar
+                      onConfirmar={() => apagarMesHistorico(mes.prefixo)}
+                    />
+                    <ChevronRight className="h-4 w-4 text-ink-300" />
+                  </div>
                 </div>
               </div>
             </Card>

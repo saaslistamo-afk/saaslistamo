@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, ListPlus, ShoppingCart, Archive, History, UserRound,
+  LayoutDashboard, ListPlus, Archive, History,
   Lock, X, Scale, ChevronDown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -17,11 +17,9 @@ import ProfilePanel from "./ProfilePanel";
 const NAV = [
   { to: "/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
   { to: "/nova-lista",     label: "Nova lista",       icon: ListPlus },
-  { to: "/modo-mercado",   label: "Modo mercado",     icon: ShoppingCart },
   { to: "/comparar-precos",label: "Comparar preços",  icon: Scale, destaque: true },
   { to: "/despensa",       label: "Despensa",          icon: Archive },
   { to: "/historico",      label: "Histórico",         icon: History },
-  { to: "/perfil-casa",    label: "Perfil da casa",    icon: UserRound },
 ];
 
 function iniciais(nome) {

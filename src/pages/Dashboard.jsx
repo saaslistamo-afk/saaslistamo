@@ -13,7 +13,6 @@ import EditBudgetModal from "../components/ui/EditBudgetModal";
 import { useApp } from "../context/AppContext";
 import { CATEGORIAS, statusValidade, diasParaVencer } from "../mock/data";
 import { gastoPorCategoria, itensEsquecidos } from "../utils/precos";
-import scanBg from "../assets/scan-bg.png";
 
 const _hoje = new Date();
 const MES_ATUAL_PREFIXO = _hoje.toISOString().slice(0, 7);
@@ -66,8 +65,13 @@ export default function Dashboard() {
       <div className="mt-5 grid grid-cols-2 gap-3 sm:hidden">
         <QuickAction icon={ListPlus} label="Nova lista" onClick={() => navigate("/nova-lista")} />
         <QuickAction icon={ShoppingCart} label="Modo mercado" onClick={() => navigate("/modo-mercado")} />
-        {isPremium && <QuickAction icon={Archive} label="Ver despensa" onClick={() => navigate("/despensa")} />}
-        {isPremium && <QuickAction icon={ScanLine} label="Escanear" onClick={() => navigate("/modo-mercado")} imagemFundo={scanBg} />}
+        {isPremium && (
+          <QuickActionDespensa
+            vencidos={despensaCritica.filter((d) => d.status === "vencido").length}
+            vencendo={despensaCritica.filter((d) => d.status === "vencendo").length}
+            onClick={() => navigate("/despensa")}
+          />
+        )}
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -167,9 +171,9 @@ export default function Dashboard() {
       {isPremium && (
         <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <Card className="animate-rise p-6 lg:col-span-2" style={{ animationDelay: "180ms" }}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-semibold text-ink-900">Resumo diário da despensa</h3>
-              <Badge tone="rose" dot>{despensaCritica.length} para atenção</Badge>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="min-w-0 font-display text-lg font-semibold text-ink-900">Resumo diário da despensa</h3>
+              <Badge tone="rose" dot className="shrink-0 whitespace-nowrap">{despensaCritica.length} para atenção</Badge>
             </div>
             <ul className="mt-4 divide-y divide-ink-900/[0.06]">
               {despensaCritica.slice(0, 4).map((item) => (
@@ -273,22 +277,7 @@ function CapsulaProgresso({ pct }) {
   );
 }
 
-function QuickAction({ icon: Icon, label, onClick, locked, imagemFundo }) {
-  if (imagemFundo) {
-    return (
-      <button
-        onClick={onClick}
-        className="relative isolate flex items-center gap-2.5 overflow-hidden rounded-xl px-3.5 py-3 text-sm font-semibold text-cream-50 shadow-soft-sm cursor-pointer transition-transform duration-200 active:scale-[0.98]"
-        style={{ backgroundImage: `url(${imagemFundo})`, backgroundSize: "cover", backgroundPosition: "center" }}
-      >
-        <span className="absolute inset-0 bg-gradient-to-r from-forest-950/90 via-forest-900/70 to-forest-900/35" />
-        <span className="relative z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-cream-50/15 text-cream-50">
-          <Icon className="h-4 w-4" />
-        </span>
-        <span className="relative z-10">{label}</span>
-      </button>
-    );
-  }
+function QuickAction({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -298,6 +287,34 @@ function QuickAction({ icon: Icon, label, onClick, locked, imagemFundo }) {
         <Icon className="h-4 w-4" />
       </span>
       {label}
+    </button>
+  );
+}
+
+function QuickActionDespensa({ vencidos, vencendo, onClick }) {
+  let texto = "Tudo certo por aqui";
+  if (vencidos > 0 && vencendo > 0) {
+    texto = `${vencendo} ${vencendo === 1 ? "item está" : "itens estão"} vencendo e ${vencidos} ${vencidos === 1 ? "venceu" : "venceram"}`;
+  } else if (vencidos > 0) {
+    texto = `${vencidos} ${vencidos === 1 ? "item venceu" : "itens venceram"}`;
+  } else if (vencendo > 0) {
+    texto = `${vencendo} ${vencendo === 1 ? "item está vencendo" : "itens estão vencendo"}`;
+  }
+
+  const critico = vencidos + vencendo > 0;
+
+  return (
+    <button
+      onClick={onClick}
+      className="col-span-2 flex items-center gap-2.5 rounded-xl border border-ink-900/[0.06] bg-paper px-3.5 py-3 text-left shadow-soft-sm cursor-pointer hover:border-forest-500/30"
+    >
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${critico ? "bg-rose-100 text-rose-600" : "bg-forest-100 text-forest-700"}`}>
+        <Archive className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <p className="text-sm font-semibold text-ink-800">Ver despensa</p>
+        <p className="truncate text-xs text-ink-500">{texto}</p>
+      </span>
     </button>
   );
 }

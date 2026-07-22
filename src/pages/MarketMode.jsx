@@ -3,7 +3,7 @@ import {
   Check, ScanLine, PartyPopper, Store, ChevronDown, Plus,
   ShoppingCart, ArrowLeft, ListPlus,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -23,7 +23,8 @@ function formatBRL(v) {
 
 export default function MarketMode() {
   const { listas } = useApp();
-  const [listaSelecionadaId, setListaSelecionadaId] = useState(null);
+  const location = useLocation();
+  const [listaSelecionadaId, setListaSelecionadaId] = useState(location.state?.listaId ?? null);
 
   const listaAtiva = listas.find((l) => l.id === listaSelecionadaId);
 
