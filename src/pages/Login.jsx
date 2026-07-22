@@ -5,6 +5,7 @@ import Button from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import logoNova from "../assets/logo-nova.png";
 import logoMark from "../assets/logo-mark.png";
+import fundoLogin from "../assets/fundo-login.webp";
 
 export default function Login() {
   const [modo, setModo] = useState("entrar");
@@ -43,7 +44,10 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div
+      className="flex min-h-screen bg-cream-100 bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `linear-gradient(rgba(250,251,252,0.6), rgba(250,251,252,0.6)), url(${fundoLogin})` }}
+    >
       {/* Painel ilustrado — escondido em mobile */}
       <div className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-forest-800 p-12 text-cream-50 lg:flex">
         <div className="paper-grain absolute inset-0" />
@@ -91,22 +95,22 @@ export default function Login() {
 
       {/* Formulário */}
       <div className="flex flex-1 items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm animate-rise">
-          <div className="mb-8 flex justify-center lg:hidden" style={{ marginTop: "-3%" }}>
-            <img src={logoNova} alt="Listamo" className="h-48 w-auto" />
+        <div className="relative w-full max-w-sm animate-rise">
+          <div className="absolute inset-x-0 bottom-full mb-4 flex justify-center lg:hidden" style={{ transform: "translateY(25%)" }}>
+            <img src={logoNova} alt="Listamo" className="h-80 w-auto" />
           </div>
 
-          <div style={{ transform: "translateY(-10vh)" }}>
-          <h1 className="font-bebas text-4xl font-semibold tracking-wide text-ink-900">
-            {modo === "entrar" ? "Bem-vinda de volta" : "Comece seu teste gratuito"}
+          <div style={{ transform: "translateY(0vh)" }} className="text-center">
+          <h1 className="inline-block rounded-2xl bg-cream-50/70 px-5 py-2 font-bebas text-4xl font-semibold tracking-wide text-ink-900 shadow-soft-sm backdrop-blur-md">
+            {modo === "entrar" ? "Que bom te ver de volta" : "Comece seu teste gratuito"}
           </h1>
-          <p className="mt-2 text-sm text-ink-600">
+          <p className="mt-2.5 inline-block rounded-full bg-cream-50/70 px-4 py-1.5 text-sm text-ink-600 shadow-soft-sm backdrop-blur-md">
             {modo === "entrar"
               ? "Entre para continuar organizando as compras da casa."
-              : "4 dias com acesso completo ao plano Premium, sem cartão."}
+              : "3 dias com acesso completo ao plano Premium, sem cartão."}
           </p>
 
-          <form onSubmit={aoEnviar} className="mt-7 flex flex-col gap-4">
+          <form onSubmit={aoEnviar} className="mt-7 flex flex-col gap-4 text-left">
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold text-ink-600">E-mail</span>
               <span className="flex items-center gap-2.5 rounded-xl border border-ink-900/10 bg-paper px-3.5 py-2.5 shadow-soft-sm focus-within:border-forest-500 focus-within:ring-2 focus-within:ring-forest-500/15">
@@ -166,20 +170,20 @@ export default function Login() {
                   } catch { setErro("Não foi possível enviar o e-mail. Tente novamente."); }
                   finally { setRecuperando(false); }
                 }}
-                className="cursor-pointer text-center text-sm text-ink-500 hover:text-terracotta-600"
+                className="cursor-pointer self-center rounded-full bg-cream-50/70 px-4 py-1.5 text-center text-sm text-ink-500 shadow-soft-sm backdrop-blur-md hover:text-terracotta-600"
               >
                 {recuperando ? "Enviando..." : "Esqueci minha senha"}
               </button>
             )}
           </form>
 
-          <p className="mt-6 text-center text-sm text-ink-600">
+          <p className="mt-6 inline-block rounded-full bg-cream-50/70 px-4 py-1.5 text-sm text-ink-600 shadow-soft-sm backdrop-blur-md">
             {modo === "entrar" ? "Ainda não tem conta?" : "Já tem uma conta?"}{" "}
             <button
               onClick={() => { setModo(modo === "entrar" ? "criar" : "entrar"); setErro(""); setMsgRecuperacao(""); }}
               className="cursor-pointer font-semibold text-terracotta-600 hover:text-terracotta-700"
             >
-              {modo === "entrar" ? "Criar conta gratuita" : "Entrar"}
+              {modo === "entrar" ? "Testar grátis por 3 dias" : "Entrar"}
             </button>
           </p>
           </div>

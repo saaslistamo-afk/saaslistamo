@@ -35,7 +35,11 @@ export function AuthProvider({ children }) {
     function carregarPlano(user) {
       if (!user) { setCarregandoPlano(false); return; }
       setCarregandoPlano(true);
-      buscarPlanoAssinatura(user)
+      // Timeout de segurança: se a consulta travar (rede, RLS, o que for),
+      // a UI não pode ficar presa no "carregando" pra sempre — cai pra
+      // "trial" depois de 5s, igual ao fallback que já existia pro auth.
+      const semResposta = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+      Promise.race([buscarPlanoAssinatura(user), semResposta])
         .then(setPlanoAssinatura)
         .catch(() => {})
         .finally(() => setCarregandoPlano(false));

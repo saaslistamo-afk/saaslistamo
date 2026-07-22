@@ -143,6 +143,13 @@ html.dark body {
   min-height: 100vh;
 }
 
+/* iOS Safari dá zoom automático ao focar campos com fonte menor que 16px —
+   força o mínimo em todo input/select/textarea pra isso nunca acontecer,
+   mesmo quando a classe utilitária usada no componente for text-sm/text-xs. */
+input, select, textarea {
+  font-size: 16px;
+}
+
 /* esconde a barra de rolagem visualmente, mantendo o scroll por arraste/swipe */
 .no-scrollbar {
   scrollbar-width: none;

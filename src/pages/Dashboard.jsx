@@ -262,10 +262,11 @@ export default function Dashboard() {
 
 function CapsulaProgresso({ pct }) {
   const cheio = Math.min(Math.max(pct, 0), 1) * 100;
+  const cor = pct >= 0.95 ? "bg-rose-400/90" : pct >= 0.75 ? "bg-amber-400/90" : "bg-cream-50/85";
   return (
     <div className="relative h-28 w-9 shrink-0 overflow-hidden rounded-full bg-cream-50/15">
       <div
-        className="absolute inset-x-0 bottom-0 rounded-full bg-cream-50/85 transition-[height] duration-700 ease-out"
+        className={`absolute inset-x-0 bottom-0 rounded-full transition-[height,background-color] duration-700 ease-out ${cor}`}
         style={{ height: `${cheio}%` }}
       />
     </div>
