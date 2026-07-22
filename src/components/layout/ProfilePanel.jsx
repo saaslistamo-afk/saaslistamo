@@ -22,6 +22,7 @@ export default function ProfilePanel({ aberto, onFechar }) {
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
+  const [erroNotif, setErroNotif] = useState("");
   function aoEscolherFoto(e) {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
@@ -48,8 +49,13 @@ export default function ProfilePanel({ aberto, onFechar }) {
 
   async function atualizarNotif(chave, valor) {
     setNotificacoes((prev) => ({ ...prev, [chave]: valor }));
+    setErroNotif("");
     if (valor) {
-      await solicitarPermissao();
+      const resultado = await solicitarPermissao();
+      if (!resultado.ok) {
+        setErroNotif(resultado.motivo);
+        setNotificacoes((prev) => ({ ...prev, [chave]: false }));
+      }
     } else {
       const algumAtivo = Object.entries(notificacoes).some(([k, v]) => k !== chave && v);
       if (!algumAtivo) await cancelarSubscription();
@@ -157,6 +163,9 @@ export default function ProfilePanel({ aberto, onFechar }) {
                 <Switch checked={notificacoes.resumoDiario} onChange={(v) => atualizarNotif("resumoDiario", v)} label="Resumo diário" />
               </div>
             </div>
+            {erroNotif && (
+              <p className="mt-3 rounded-lg bg-rose-100 px-3.5 py-2.5 text-xs font-medium text-rose-600">{erroNotif}</p>
+            )}
           </div>
 
           {/* Plano */}
