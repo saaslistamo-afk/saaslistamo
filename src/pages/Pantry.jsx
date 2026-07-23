@@ -1,5 +1,5 @@
 import { useMemo, useState, lazy, Suspense } from "react";
-import { Plus, X, Archive, ScanLine, Pencil, Trash2 } from "lucide-react";
+import { Plus, X, Archive, ScanLine, Pencil, Trash2, ShoppingBag, Check, Store } from "lucide-react";
 const BarcodeScanner = lazy(() => import("../components/ui/BarcodeScanner"));
 import Button from "../components/ui/Button";
 import ScanButton from "../components/ui/ScanButton";
@@ -19,10 +19,14 @@ const FILTROS = [
 const HOJE = new Date();
 
 export default function Pantry() {
-  const { isPremium, despensa: itens, adicionarItemDespensa, editarItemDespensa, removerItemDespensa } = useApp();
+  const {
+    isPremium, despensa: itens, adicionarItemDespensa, adicionarItensDespensa, editarItemDespensa, removerItemDespensa,
+    ultimaCompra,
+  } = useApp();
   const [filtro, setFiltro] = useState("todos");
   const [modalAberto, setModalAberto] = useState(false);
   const [scannerAberto, setScannerAberto] = useState(false);
+  const [importarAberto, setImportarAberto] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novaValidade, setNovaValidade] = useState("");
   const [novaQuantidade, setNovaQuantidade] = useState(1);
@@ -133,7 +137,12 @@ export default function Pantry() {
             <h1 className="font-display text-[2rem] font-semibold tracking-tight text-ink-900 sm:text-[2.2rem]">O que tem em casa</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {ultimaCompra && ultimaCompra.itens.length > 0 && (
+            <Button variant="outline" className="rounded-full" onClick={() => setImportarAberto(true)}>
+              <ShoppingBag className="h-4 w-4" /> Adicionar da última compra
+            </Button>
+          )}
           <ScanButton className="rounded-full" onClick={() => setScannerAberto(true)}>
             <ScanLine className="h-4 w-4" /> Escanear
           </ScanButton>
@@ -313,6 +322,136 @@ export default function Pantry() {
           />
         </Suspense>
       )}
+
+      {importarAberto && ultimaCompra && (
+        <ImportarCompraModal
+          compra={ultimaCompra}
+          onFechar={() => setImportarAberto(false)}
+          onImportar={(itensSelecionados) => {
+            adicionarItensDespensa(itensSelecionados);
+            setImportarAberto(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ImportarCompraModal({ compra, onFechar, onImportar }) {
+  const [selecionados, setSelecionados] = useState(() => new Set(compra.itens.map((_, i) => i)));
+  const [quantidades, setQuantidades] = useState(() => compra.itens.map((i) => i.quantidade ?? 1));
+  const [validadePadrao, setValidadePadrao] = useState(() => {
+    const daqui30 = new Date();
+    daqui30.setDate(daqui30.getDate() + 30);
+    return daqui30.toISOString().slice(0, 10);
+  });
+
+  function alternarSelecao(i) {
+    setSelecionados((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(i)) novo.delete(i);
+      else novo.add(i);
+      return novo;
+    });
+  }
+
+  function confirmar() {
+    if (!validadePadrao || selecionados.size === 0) return;
+    const itensNovos = compra.itens
+      .map((item, i) => ({
+        nomeProduto: item.produto,
+        quantidade: Number(quantidades[i]) || 1,
+        dataValidade: validadePadrao,
+        categoria: inferirCategoria(item.produto),
+      }))
+      .filter((_, i) => selecionados.has(i));
+    onImportar(itensNovos);
+  }
+
+  const dataFormatada = compra.data
+    ? new Date(`${compra.data}T12:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "long" })
+    : "";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 backdrop-blur-sm">
+      <div className="relative flex w-full max-w-sm flex-col overflow-hidden rounded-[1.75rem] bg-paper shadow-lift" style={{ maxHeight: "88vh" }}>
+        <div className="flex items-start justify-between gap-3 border-b border-ink-900/[0.06] px-6 py-5">
+          <div>
+            <h2 className="font-display text-xl font-semibold text-ink-900">Adicionar da última compra</h2>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-500">
+              <Store className="h-3.5 w-3.5" /> {compra.mercado} · {dataFormatada}
+            </p>
+          </div>
+          <button
+            onClick={onFechar}
+            aria-label="Fechar"
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-ink-900/5 text-ink-500 hover:bg-ink-900/10 hover:text-ink-700"
+          >
+            <X className="h-4.5 w-4.5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-xs font-semibold text-ink-600">Validade padrão para os selecionados</span>
+            <input
+              type="date"
+              value={validadePadrao}
+              onChange={(e) => setValidadePadrao(e.target.value)}
+              className="w-full rounded-2xl border border-ink-900/10 bg-cream-100 px-4 py-3 text-sm outline-none focus:border-forest-500 focus:ring-2 focus:ring-forest-500/15"
+            />
+            <span className="mt-1 block text-xs text-ink-400">Você pode ajustar item por item depois, na própria despensa.</span>
+          </label>
+
+          <div className="flex flex-col gap-2">
+            {compra.itens.map((item, i) => {
+              const marcado = selecionados.has(i);
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border p-3 transition-colors",
+                    marcado ? "border-forest-500/30 bg-forest-100/50" : "border-ink-900/[0.06] bg-paper"
+                  )}
+                >
+                  <button
+                    onClick={() => alternarSelecao(i)}
+                    aria-label={marcado ? `Remover ${item.produto} da seleção` : `Selecionar ${item.produto}`}
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-colors",
+                      marcado ? "border-forest-600 bg-forest-600 text-cream-50" : "border-ink-900/20 text-transparent"
+                    )}
+                  >
+                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                  </button>
+                  <button onClick={() => alternarSelecao(i)} className="min-w-0 flex-1 cursor-pointer text-left">
+                    <p className="truncate text-sm font-medium text-ink-900">{item.produto}</p>
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    value={quantidades[i]}
+                    onChange={(e) => setQuantidades((prev) => prev.map((q, idx) => (idx === i ? e.target.value : q)))}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-16 shrink-0 rounded-xl border border-ink-900/10 bg-cream-100 px-2.5 py-1.5 text-center text-sm outline-none focus:border-forest-500 focus:ring-2 focus:ring-forest-500/15"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-ink-900/[0.06] px-6 py-5">
+          <Button
+            className="w-full rounded-full"
+            size="lg"
+            disabled={!validadePadrao || selecionados.size === 0}
+            onClick={confirmar}
+          >
+            Adicionar {selecionados.size > 0 ? `${selecionados.size} ` : ""}{selecionados.size === 1 ? "item" : "itens"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

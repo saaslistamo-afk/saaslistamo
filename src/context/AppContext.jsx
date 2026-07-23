@@ -143,9 +143,14 @@ export function AppProvider({ children }) {
     const total = comprados.reduce((s, i) => s + i.preco * i.quantidade, 0);
     if (total <= 0) return 0;
     atualizarItensLista(listaId, (itens) => itens.filter((i) => i.status !== "carrinho"));
+    // compraId identifica os itens que vieram da mesma finalização de compra
+    // (data+mercado sozinhos colidiriam se a pessoa finalizar duas compras
+    // no mesmo dia no mesmo mercado) — usado pra "Adicionar da última compra"
+    // na despensa saber exatamente quais itens vieram juntos.
+    const compraId = Date.now();
     setHistoricoPrecos((prev) => [
       ...prev,
-      ...comprados.map((i) => ({ produto: i.nome, preco: i.preco, quantidade: i.quantidade, mercado: mercadoAtual, data: new Date().toISOString().slice(0, 10) })),
+      ...comprados.map((i) => ({ produto: i.nome, preco: i.preco, quantidade: i.quantidade, mercado: mercadoAtual, data: new Date().toISOString().slice(0, 10), compraId })),
     ]);
     return total;
   }
@@ -164,6 +169,12 @@ export function AppProvider({ children }) {
   function adicionarItemDespensa(dadosItem) {
     setDespensaLocal((prev) => [...prev, { id: Date.now(), ...dadosItem }]);
   }
+  function adicionarItensDespensa(itensNovos) {
+    setDespensaLocal((prev) => [
+      ...prev,
+      ...itensNovos.map((dadosItem, i) => ({ id: Date.now() + i, ...dadosItem })),
+    ]);
+  }
   function editarItemDespensa(id, dados) {
     setDespensaLocal((prev) => prev.map((i) => i.id === id ? { ...i, ...dados } : i));
   }
@@ -175,6 +186,18 @@ export function AppProvider({ children }) {
     () => historicoPrecos.filter((r) => r.data?.startsWith(MES_ATUAL_PREFIXO)).reduce((s, r) => s + r.preco * (r.quantidade ?? 1), 0),
     [historicoPrecos]
   );
+
+  // Última compra finalizada — agrupa pelos registros que compartilham o
+  // mesmo compraId (ou, para compras antigas sem compraId, mesma data +
+  // mercado) — usada pelo botão "Adicionar da última compra" na despensa.
+  const ultimaCompra = useMemo(() => {
+    if (historicoPrecos.length === 0) return null;
+    const maisRecente = [...historicoPrecos].sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""))[0];
+    const doGrupo = historicoPrecos.filter((r) =>
+      maisRecente.compraId ? r.compraId === maisRecente.compraId : (r.data === maisRecente.data && r.mercado === maisRecente.mercado)
+    );
+    return { data: maisRecente.data, mercado: maisRecente.mercado, itens: doGrupo };
+  }, [historicoPrecos]);
 
   const value = useMemo(() => {
     const diasUsados = usuario?.created_at
@@ -198,8 +221,8 @@ export function AppProvider({ children }) {
       apagarMesHistorico,
       boasVindasPremium, setBoasVindasPremium,
       mercados, mercadoAtual, setMercadoAtual, adicionarMercado,
-      historicoPrecos,
-      despensa, adicionarItemDespensa, editarItemDespensa, removerItemDespensa,
+      historicoPrecos, ultimaCompra,
+      despensa, adicionarItemDespensa, adicionarItensDespensa, editarItemDespensa, removerItemDespensa,
       faixasIdade, setFaixasIdade,
       restricoesAlimentares, setRestricoesAlimentares,
       darkMode, setDarkMode,
@@ -210,7 +233,7 @@ export function AppProvider({ children }) {
     };
   }, [
     usuario, planoAssinatura, overridePlanoDev, trialBannerVisivel, orcamento, listas, gastoMes,
-    mercados, mercadoAtual, historicoPrecos, despensa,
+    mercados, mercadoAtual, historicoPrecos, ultimaCompra, despensa,
     faixasIdade, restricoesAlimentares, darkMode, fotoPerfil, nome, email, notificacoes,
     boasVindasPremium,
   ]);
