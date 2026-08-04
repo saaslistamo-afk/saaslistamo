@@ -41,6 +41,7 @@ export function AppProvider({ children }) {
   const [overridePlanoDev, setOverridePlanoDev] = useState(null);
   const [sincronizado, setSincronizado] = useState(false);
   const saveTimerRef = useRef(null);
+  const dadosPendentesRef = useRef(null);
 
   const [trialBannerVisivel, setTrialBannerVisivel] = usarEstadoPersistido("listamo:trialBanner", true);
   const [orcamento, setOrcamento]                   = usarEstadoPersistido("listamo:orcamento", 0);
@@ -101,24 +102,53 @@ export function AppProvider({ children }) {
   // Salva no Supabase sempre que dados mudam (debounced 2s)
   useEffect(() => {
     if (!sincronizado || !usuario?.id) return;
+    const payload = {
+      user_id: usuario.id,
+      listas,
+      despensa,
+      historico_precos: historicoPrecos,
+      orcamento,
+      mercados,
+      mercado_atual: mercadoAtual,
+      notificacoes,
+      faixas_idade: faixasIdade,
+      restricoes: restricoesAlimentares,
+      updated_at: new Date().toISOString(),
+    };
+    dadosPendentesRef.current = payload;
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      supabase.from("dados_usuario").upsert({
-        user_id: usuario.id,
-        listas,
-        despensa,
-        historico_precos: historicoPrecos,
-        orcamento,
-        mercados,
-        mercado_atual: mercadoAtual,
-        notificacoes,
-        faixas_idade: faixasIdade,
-        restricoes: restricoesAlimentares,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
-    }, 2000);
+    saveTimerRef.current = setTimeout(() => salvarNoSupabase(payload), 2000);
     return () => clearTimeout(saveTimerRef.current);
   }, [sincronizado, listas, despensa, historicoPrecos, orcamento, mercados, mercadoAtual, notificacoes, faixasIdade, restricoesAlimentares, usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function salvarNoSupabase(payload) {
+    dadosPendentesRef.current = null;
+    supabase.from("dados_usuario").upsert(payload, { onConflict: "user_id" }).then(({ error }) => {
+      if (error) console.error("[listamo] falha ao salvar dados_usuario:", error);
+    });
+  }
+
+  // No celular, sair do app (trocar de app, apagar a tela) suspende o
+  // JavaScript quase instantaneamente — o debounce de 2s acima nunca chega
+  // a disparar se a pessoa não ficar parada na tela esse tempo todo. Sem
+  // isso, uma alteração feita e seguida de troca de app (ex.: ativar uma
+  // notificação e sair) nunca era salva de verdade no servidor.
+  useEffect(() => {
+    function forcarSalvamento() {
+      if (!dadosPendentesRef.current) return;
+      clearTimeout(saveTimerRef.current);
+      salvarNoSupabase(dadosPendentesRef.current);
+    }
+    function aoMudarVisibilidade() {
+      if (document.hidden) forcarSalvamento();
+    }
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+    window.addEventListener("pagehide", forcarSalvamento);
+    return () => {
+      document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+      window.removeEventListener("pagehide", forcarSalvamento);
+    };
+  }, []);
 
   // — Listas CRUD —
   function criarLista(nomeParam) {
