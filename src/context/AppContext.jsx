@@ -42,6 +42,11 @@ export function AppProvider({ children }) {
   const [sincronizado, setSincronizado] = useState(false);
   const saveTimerRef = useRef(null);
   const dadosPendentesRef = useRef(null);
+  // "assinatura" (JSON) do último estado já confirmado no servidor — usada
+  // pra não fazer upsert nenhum quando nada mudou desde então (ex.: abrir o
+  // app só pra olhar, sem editar nada), já que sincronizado vira true em
+  // toda sessão.
+  const ultimoSalvoRef = useRef(null);
 
   const [trialBannerVisivel, setTrialBannerVisivel] = usarEstadoPersistido("listamo:trialBanner", true);
   const [orcamento, setOrcamento]                   = usarEstadoPersistido("listamo:orcamento", 0);
@@ -84,26 +89,42 @@ export function AppProvider({ children }) {
       .eq("user_id", usuario.id)
       .maybeSingle()
       .then(({ data }) => {
+        // Monta o estado resultante do carregamento com a mesma regra usada
+        // abaixo pra decidir os setState (server só sobrescreve quando tem
+        // algo de fato) — vira a base de comparação pra saber se algo mudou
+        // depois, em vez de gravar de novo um estado idêntico ao do banco.
+        const carregado = {
+          listas: (Array.isArray(data?.listas) && data.listas.length) ? data.listas : listas,
+          despensa: (Array.isArray(data?.despensa) && data.despensa.length) ? data.despensa : despensa,
+          historico_precos: Array.isArray(data?.historico_precos) ? data.historico_precos : historicoPrecos,
+          orcamento: (typeof data?.orcamento === "number" && data.orcamento > 0) ? data.orcamento : orcamento,
+          mercados: (Array.isArray(data?.mercados) && data.mercados.length) ? data.mercados : mercados,
+          mercado_atual: data?.mercado_atual ?? mercadoAtual,
+          notificacoes: data?.notificacoes ?? notificacoes,
+          faixas_idade: Array.isArray(data?.faixas_idade) ? data.faixas_idade.map(normalizarMorador) : faixasIdade,
+          restricoes: Array.isArray(data?.restricoes) ? data.restricoes : restricoesAlimentares,
+        };
         if (data) {
-          if (Array.isArray(data.listas) && data.listas.length)           setListas(data.listas);
-          if (Array.isArray(data.despensa) && data.despensa.length)       setDespensaLocal(data.despensa);
-          if (Array.isArray(data.historico_precos))                       setHistoricoPrecos(data.historico_precos);
-          if (typeof data.orcamento === "number" && data.orcamento > 0)  setOrcamento(data.orcamento);
-          if (Array.isArray(data.mercados) && data.mercados.length)      setMercados(data.mercados);
-          if (data.mercado_atual)                                         setMercadoAtual(data.mercado_atual);
-          if (data.notificacoes)                                          setNotificacoes(data.notificacoes);
-          if (Array.isArray(data.faixas_idade))                          setFaixasIdade(data.faixas_idade.map(normalizarMorador));
-          if (Array.isArray(data.restricoes))                            setRestricoesAlimentares(data.restricoes);
+          setListas(carregado.listas);
+          setDespensaLocal(carregado.despensa);
+          setHistoricoPrecos(carregado.historico_precos);
+          setOrcamento(carregado.orcamento);
+          setMercados(carregado.mercados);
+          setMercadoAtual(carregado.mercado_atual);
+          setNotificacoes(carregado.notificacoes);
+          setFaixasIdade(carregado.faixas_idade);
+          setRestricoesAlimentares(carregado.restricoes);
         }
+        ultimoSalvoRef.current = JSON.stringify(carregado);
         setSincronizado(true);
       });
   }, [usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Salva no Supabase sempre que dados mudam (debounced 2s)
+  // Salva no Supabase sempre que dados mudam de verdade (debounced 2s) — se
+  // o estado atual já bate com o que confirmamos salvo, nem agenda nada.
   useEffect(() => {
     if (!sincronizado || !usuario?.id) return;
-    const payload = {
-      user_id: usuario.id,
+    const dados = {
       listas,
       despensa,
       historico_precos: historicoPrecos,
@@ -113,18 +134,22 @@ export function AppProvider({ children }) {
       notificacoes,
       faixas_idade: faixasIdade,
       restricoes: restricoesAlimentares,
-      updated_at: new Date().toISOString(),
     };
-    dadosPendentesRef.current = payload;
+    const assinatura = JSON.stringify(dados);
+    if (assinatura === ultimoSalvoRef.current) return;
+
+    const payload = { user_id: usuario.id, ...dados, updated_at: new Date().toISOString() };
+    dadosPendentesRef.current = { payload, assinatura };
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => salvarNoSupabase(payload), 2000);
+    saveTimerRef.current = setTimeout(() => salvarNoSupabase(dadosPendentesRef.current), 2000);
     return () => clearTimeout(saveTimerRef.current);
   }, [sincronizado, listas, despensa, historicoPrecos, orcamento, mercados, mercadoAtual, notificacoes, faixasIdade, restricoesAlimentares, usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function salvarNoSupabase(payload) {
+  function salvarNoSupabase({ payload, assinatura }) {
     dadosPendentesRef.current = null;
     supabase.from("dados_usuario").upsert(payload, { onConflict: "user_id" }).then(({ error }) => {
-      if (error) console.error("[listamo] falha ao salvar dados_usuario:", error);
+      if (error) { console.error("[listamo] falha ao salvar dados_usuario:", error); return; }
+      ultimoSalvoRef.current = assinatura;
     });
   }
 
