@@ -22,7 +22,6 @@ const MarketMode       = lazy(() => import("./pages/MarketMode"));
 const Pantry           = lazy(() => import("./pages/Pantry"));
 const ComparePrices    = lazy(() => import("./pages/ComparePrices"));
 const History          = lazy(() => import("./pages/History"));
-const HouseholdProfile = lazy(() => import("./pages/HouseholdProfile"));
 
 function RotaPrivada({ children, exigeAssinatura = true }) {
   const { usuario, carregandoAuth, carregandoPlano } = useAuth();
@@ -73,7 +72,6 @@ export default function App() {
         <Route path="/despensa"        element={<RotaPrivada><ComShell><Pantry /></ComShell></RotaPrivada>} />
         <Route path="/comparar-precos" element={<RotaPrivada><ComShell><ComparePrices /></ComShell></RotaPrivada>} />
         <Route path="/historico"       element={<RotaPrivada><ComShell><History /></ComShell></RotaPrivada>} />
-        <Route path="/perfil-casa"     element={<RotaPrivada><ComShell><HouseholdProfile /></ComShell></RotaPrivada>} />
         <Route path="*"               element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>

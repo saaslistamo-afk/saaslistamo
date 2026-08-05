@@ -25,10 +25,6 @@ function usarEstadoPersistido(chave, padrao) {
   return [valor, setValor];
 }
 
-function normalizarMorador(item) {
-  return typeof item === "string" ? { nome: "", faixa: item } : item;
-}
-
 export function AppProvider({ children }) {
   const { usuario, planoAssinatura } = useAuth();
   // Override só pro seletor "Visualizando como" (DEV). Em produção fica
@@ -56,8 +52,6 @@ export function AppProvider({ children }) {
   const [historicoPrecos, setHistoricoPrecos]       = usarEstadoPersistido("listamo:historicoPrecos", []);
   const [boasVindasPremium, setBoasVindasPremium]   = usarEstadoPersistido("listamo:boasVindas", false);
   const [despensa, setDespensaLocal]                = usarEstadoPersistido("listamo:despensa", []);
-  const [faixasIdade, setFaixasIdade]               = usarEstadoPersistido("listamo:faixasIdade", []);
-  const [restricoesAlimentares, setRestricoesAlimentares] = usarEstadoPersistido("listamo:restricoes", []);
   const [darkMode, setDarkMode]     = usarEstadoPersistido("listamo:darkMode", false);
   const [fotoPerfil, setFotoPerfil] = usarEstadoPersistido("listamo:fotoPerfil", null);
   const [nome, setNome]             = usarEstadoPersistido("listamo:nome", "");
@@ -101,8 +95,6 @@ export function AppProvider({ children }) {
           mercados: (Array.isArray(data?.mercados) && data.mercados.length) ? data.mercados : mercados,
           mercado_atual: data?.mercado_atual ?? mercadoAtual,
           notificacoes: data?.notificacoes ?? notificacoes,
-          faixas_idade: Array.isArray(data?.faixas_idade) ? data.faixas_idade.map(normalizarMorador) : faixasIdade,
-          restricoes: Array.isArray(data?.restricoes) ? data.restricoes : restricoesAlimentares,
         };
         if (data) {
           setListas(carregado.listas);
@@ -112,8 +104,6 @@ export function AppProvider({ children }) {
           setMercados(carregado.mercados);
           setMercadoAtual(carregado.mercado_atual);
           setNotificacoes(carregado.notificacoes);
-          setFaixasIdade(carregado.faixas_idade);
-          setRestricoesAlimentares(carregado.restricoes);
         }
         ultimoSalvoRef.current = JSON.stringify(carregado);
         setSincronizado(true);
@@ -132,8 +122,6 @@ export function AppProvider({ children }) {
       mercados,
       mercado_atual: mercadoAtual,
       notificacoes,
-      faixas_idade: faixasIdade,
-      restricoes: restricoesAlimentares,
     };
     const assinatura = JSON.stringify(dados);
     if (assinatura === ultimoSalvoRef.current) return;
@@ -143,7 +131,7 @@ export function AppProvider({ children }) {
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => salvarNoSupabase(dadosPendentesRef.current), 2000);
     return () => clearTimeout(saveTimerRef.current);
-  }, [sincronizado, listas, despensa, historicoPrecos, orcamento, mercados, mercadoAtual, notificacoes, faixasIdade, restricoesAlimentares, usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sincronizado, listas, despensa, historicoPrecos, orcamento, mercados, mercadoAtual, notificacoes, usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function salvarNoSupabase({ payload, assinatura }) {
     dadosPendentesRef.current = null;
@@ -263,7 +251,7 @@ export function AppProvider({ children }) {
     const plano = overridePlanoDev ?? planoAssinatura ?? "trial";
     const isPremium = plano === "premium" || (plano === "trial" && trialAtivo);
     return {
-      usuario: { nome, email, trialDiasRestantes, perfilCasa: { faixasIdade, restricoes: restricoesAlimentares } },
+      usuario: { nome, email, trialDiasRestantes },
       plano,
       setPlano: import.meta.env.DEV ? setOverridePlanoDev : undefined,
       isPremium,
@@ -278,8 +266,6 @@ export function AppProvider({ children }) {
       mercados, mercadoAtual, setMercadoAtual, adicionarMercado,
       historicoPrecos, ultimaCompra,
       despensa, adicionarItemDespensa, adicionarItensDespensa, editarItemDespensa, removerItemDespensa,
-      faixasIdade, setFaixasIdade,
-      restricoesAlimentares, setRestricoesAlimentares,
       darkMode, setDarkMode,
       fotoPerfil, setFotoPerfil,
       nome, setNome,
@@ -289,7 +275,7 @@ export function AppProvider({ children }) {
   }, [
     usuario, planoAssinatura, overridePlanoDev, trialBannerVisivel, orcamento, listas, gastoMes,
     mercados, mercadoAtual, historicoPrecos, ultimaCompra, despensa,
-    faixasIdade, restricoesAlimentares, darkMode, fotoPerfil, nome, email, notificacoes,
+    darkMode, fotoPerfil, nome, email, notificacoes,
     boasVindasPremium,
   ]);
 

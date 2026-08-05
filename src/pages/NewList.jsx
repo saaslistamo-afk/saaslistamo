@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import {
   Plus, Trash2, ScanLine, FileDown, Sparkle, Pencil, Check, Scale, Tag,
   ChevronRight, ListPlus, ArrowLeft, ShoppingCart,
@@ -13,7 +13,7 @@ import EditBudgetModal from "../components/ui/EditBudgetModal";
 import { useApp } from "../context/AppContext";
 const BarcodeScanner = lazy(() => import("../components/ui/BarcodeScanner"));
 import { CATEGORIAS } from "../mock/data";
-import { inferirCategoria, quantidadeSugerida, restricaoConflitante } from "../utils/categorizar";
+import { inferirCategoria } from "../utils/categorizar";
 import { ultimoPrecoPorMercado, produtosRecorrentes, ehRecorrente } from "../utils/precos";
 
 function formatBRL(v) {
@@ -146,12 +146,11 @@ function BotaoExcluirLista({ nome, onConfirmar }) {
 }
 
 function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcluirLista, comecarRenomeando = false }) {
-  const { isPremium, orcamento, setOrcamento, historicoPrecos, faixasIdade, restricoesAlimentares } = useApp();
+  const { isPremium, orcamento, setOrcamento, historicoPrecos } = useApp();
   const navigate = useNavigate();
   const itens = lista.itens;
   const [nome, setNome] = useState("");
   const [quantidade, setQuantidade] = useState(1);
-  const [quantidadeTocada, setQuantidadeTocada] = useState(false);
   const [preco, setPreco] = useState("");
   const [scannerAberto, setScannerAberto] = useState(false);
   const [editandoOrcamento, setEditandoOrcamento] = useState(false);
@@ -167,18 +166,8 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
     setEditandoNome(false);
   }
 
-  // auto-preenche quantidade sugerida conforme o nome digitado e o tamanho da casa
-  useEffect(() => {
-    if (quantidadeTocada || !isPremium) return;
-    if (nome.length < 3) { setQuantidade(1); return; }
-    setQuantidade(quantidadeSugerida(nome, faixasIdade.length));
-  }, [nome, isPremium, quantidadeTocada, faixasIdade.length]);
-
   const total = itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
 
-  const conflito = nome.trim().length >= 2
-    ? restricaoConflitante(nome, restricoesAlimentares)
-    : null;
   const comparacaoPreco = ultimoPrecoPorMercado(nome, historicoPrecos);
   const sugestoesRecorrentes = produtosRecorrentes(historicoPrecos, itens);
 
@@ -192,7 +181,6 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
     setNome("");
     setPreco("");
     setQuantidade(1);
-    setQuantidadeTocada(false);
   }
 
   function adicionarSugestaoRecorrente(nomeProduto) {
@@ -377,7 +365,7 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
                   type="number"
                   min="1"
                   value={quantidade}
-                  onChange={(e) => { setQuantidade(e.target.value); setQuantidadeTocada(true); }}
+                  onChange={(e) => setQuantidade(e.target.value)}
                   className="w-full rounded-xl border border-ink-900/10 bg-paper px-3 py-2.5 text-sm text-ink-900 shadow-soft-sm outline-none focus:border-forest-500 focus:ring-2 focus:ring-forest-500/15"
                 />
               </label>
@@ -430,12 +418,6 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
-            {conflito && (
-              <div className="animate-rise mt-3 flex items-center gap-2 rounded-lg bg-amber-100 px-3.5 py-2.5 text-xs font-medium text-ink-700">
-                <span className="text-amber-600">⚠</span>
-                <span>Sua casa tem restrição registrada para <strong className="font-semibold text-ink-900">{conflito}</strong> — esse produto pode conflitar.</span>
               </div>
             )}
           </Card>

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, UserRound, Clock, Smartphone } from "lucide-react";
+import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, Clock, Smartphone } from "lucide-react";
 import Button from "../ui/Button";
 import Switch from "../ui/Switch";
 import { useApp } from "../../context/AppContext";
@@ -206,21 +206,6 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
                 Plano <span className="capitalize">{plano}</span>
               </span>
               <span className="text-xs font-semibold text-terracotta-600">Gerenciar</span>
-            </button>
-          </div>
-
-          {/* Perfil da casa */}
-          <div className="border-b border-ink-900/[0.06] py-6">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400">Casa</p>
-            <button
-              onClick={() => irPara("/perfil-casa")}
-              className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-ink-900/[0.06] bg-cream-100 px-4 py-3 text-left hover:border-forest-500/30"
-            >
-              <span className="flex items-center gap-2.5 text-sm font-medium text-ink-800">
-                <UserRound className="h-4 w-4 text-forest-700" />
-                Perfil da casa
-              </span>
-              <span className="text-xs font-semibold text-terracotta-600">Editar</span>
             </button>
           </div>
 

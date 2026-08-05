@@ -23,48 +23,6 @@ function singular(palavra) {
   return palavra.length > 3 && palavra.endsWith("s") ? palavra.slice(0, -1) : palavra;
 }
 
-// quantidade base por pessoa por compra, por categoria — calibrada pra uma
-// compra semanal/quinzenal típica; ajustada conforme o número de moradores
-const CONSUMO_PER_PESSOA = {
-  laticinios: 1.5,
-  carnes: 0.5,
-  hortifruti: 1.5,
-  padaria: 0.5,
-  limpeza: 0.2,
-  higiene: 0.3,
-  bebidas: 0.5,
-  mercearia: 0.5,
-  congelados: 0.3,
-};
-
-export function quantidadeSugerida(nomeProduto, numeroPessoas) {
-  if (!numeroPessoas || numeroPessoas <= 0) return 1;
-  const categoria = inferirCategoria(nomeProduto);
-  const fator = CONSUMO_PER_PESSOA[categoria] ?? 0.5;
-  return Math.max(1, Math.round(numeroPessoas * fator));
-}
-
-// palavras que sinalizam conflito com cada restrição alimentar
-const PALAVRAS_RESTRICAO = {
-  "Sem lactose": ["leite", "queijo", "iogurte", "manteiga", "requeijao", "margarina", "creme de leite", "leite condensado"],
-  "Sem glúten":  ["pao", "macarrao", "biscoito", "bolo", "farinha de trigo", "cerveja", "torrada"],
-  "Vegetariano": ["frango", "carne", "peixe", "linguica", "bacon", "presunto", "bisteca", "costela"],
-  "Vegano":      ["frango", "carne", "peixe", "linguica", "bacon", "presunto", "leite", "queijo", "iogurte", "manteiga", "ovo", "mel"],
-  "Diabético":   ["acucar", "refrigerante", "chocolate", "bolo", "sorvete", "doce"],
-  "Sem açúcar":  ["acucar", "refrigerante", "chocolate", "sorvete", "doce"],
-};
-
-// retorna o nome da primeira restrição que conflita com o produto, ou null
-export function restricaoConflitante(nomeProduto, restricoesAtivas) {
-  if (!restricoesAtivas?.length) return null;
-  const nome = normalizar(nomeProduto);
-  for (const restricao of restricoesAtivas) {
-    const palavras = PALAVRAS_RESTRICAO[restricao] ?? [];
-    if (palavras.some((p) => nome.includes(normalizar(p)))) return restricao;
-  }
-  return null;
-}
-
 export function inferirCategoria(nomeProduto) {
   const nome = normalizar(nomeProduto);
   const palavrasDoNome = nome.split(/\s+/).map(singular);

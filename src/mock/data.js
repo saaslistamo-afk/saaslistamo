@@ -19,30 +19,11 @@ export const PLANOS = [
       "Despensa com alerta de validade",
       "Resumo diário da despensa",
       "Alerta de itens esquecidos",
-      "Perfil da casa e sugestões de quantidade",
       "Histórico ilimitado + comparativo entre meses",
       "Exportar lista em PDF",
     ],
   },
 ];
-
-export const USUARIO = {
-  nome: "Marina Couto",
-  email: "marina.couto@email.com",
-  plano: "premium", // "trial" | "basico" | "essencial" | "premium" | "bloqueado"
-  trialDiasRestantes: 3,
-  trialAtivo: false,
-  orcamentoMensal: 1200,
-  perfilCasa: {
-    pessoas: 3,
-    faixasIdade: [
-      { nome: "Marina", faixa: "Adulto" },
-      { nome: "Pedro", faixa: "Adulto" },
-      { nome: "Biel", faixa: "Criança (3-12 anos)" },
-    ],
-    restricoes: ["Sem lactose"],
-  },
-};
 
 export const CATEGORIAS = {
   hortifruti: { label: "Hortifruti", icon: "Carrot", cor: "forest" },
