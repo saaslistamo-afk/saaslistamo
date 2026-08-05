@@ -193,15 +193,21 @@ function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoj
 
   if (prefs.validade) {
     const despensa = (dadosUsuario.despensa as Array<{ dataValidade?: string }>) ?? [];
-    const criticos = despensa.filter((d) => {
-      if (!d.dataValidade) return false;
+    let vencidos = 0;
+    let vencendo = 0;
+    for (const d of despensa) {
+      if (!d.dataValidade) continue;
       const s = statusValidade(d.dataValidade, hoje);
-      return s === "vencendo" || s === "vencido";
-    });
-    if (criticos.length > 0) {
+      if (s === "vencido") vencidos++;
+      else if (s === "vencendo") vencendo++;
+    }
+    if (vencidos > 0 || vencendo > 0) {
+      const partes: string[] = [];
+      if (vencendo > 0) partes.push(`${vencendo} ${vencendo === 1 ? "item está" : "itens estão"} vencendo`);
+      if (vencidos > 0) partes.push(`${vencidos} ${vencidos === 1 ? "venceu" : "venceram"}`);
       notificacoes.push({
         title: "Atenção na despensa!",
-        body: `${criticos.length} ${criticos.length === 1 ? "item está" : "itens estão"} vencendo ou vencidos. Confira agora.`,
+        body: `${partes.join(" e ")}. Confira já.`,
         url: "/despensa",
         tag: "despensa",
       });

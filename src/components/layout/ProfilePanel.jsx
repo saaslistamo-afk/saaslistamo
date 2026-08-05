@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, UserRound, Clock } from "lucide-react";
+import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, UserRound, Clock, Smartphone } from "lucide-react";
 import Button from "../ui/Button";
 import Switch from "../ui/Switch";
 import { useApp } from "../../context/AppContext";
@@ -11,7 +11,7 @@ function iniciais(nome) {
   return nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 }
 
-export default function ProfilePanel({ aberto, onFechar }) {
+export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }) {
   const {
     usuario, plano,
     darkMode, setDarkMode, fotoPerfil, setFotoPerfil,
@@ -39,6 +39,11 @@ export default function ProfilePanel({ aberto, onFechar }) {
   function irPara(rota) {
     onFechar();
     navigate(rota);
+  }
+
+  function aoAbrirGuiaInstalacao() {
+    onFechar();
+    onAbrirGuiaInstalacao();
   }
 
   async function aoSair() {
@@ -203,7 +208,7 @@ export default function ProfilePanel({ aberto, onFechar }) {
           </div>
 
           {/* Perfil da casa */}
-          <div className="py-6">
+          <div className="border-b border-ink-900/[0.06] py-6">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400">Casa</p>
             <button
               onClick={() => irPara("/perfil-casa")}
@@ -214,6 +219,21 @@ export default function ProfilePanel({ aberto, onFechar }) {
                 Perfil da casa
               </span>
               <span className="text-xs font-semibold text-terracotta-600">Editar</span>
+            </button>
+          </div>
+
+          {/* Ajuda */}
+          <div className="py-6">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400">Ajuda</p>
+            <button
+              onClick={aoAbrirGuiaInstalacao}
+              className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-ink-900/[0.06] bg-cream-100 px-4 py-3 text-left hover:border-forest-500/30"
+            >
+              <span className="flex items-center gap-2.5 text-sm font-medium text-ink-800">
+                <Smartphone className="h-4 w-4 text-forest-700" />
+                Como ativar notificações
+              </span>
+              <span className="text-xs font-semibold text-terracotta-600">Ver passo a passo</span>
             </button>
           </div>
 

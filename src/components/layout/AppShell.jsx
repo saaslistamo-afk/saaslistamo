@@ -13,6 +13,7 @@ import logoNameDark from "../../assets/logo-name-dark.png";
 import logoMark from "../../assets/logo-mark.png";
 import logoMarkDark from "../../assets/logo-mark-dark.png";
 import ProfilePanel from "./ProfilePanel";
+import GuiaInstalacao from "../ui/GuiaInstalacao";
 
 const NAV = [
   { to: "/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
@@ -27,11 +28,41 @@ function iniciais(nome) {
 }
 
 export default function AppShell({ children }) {
-  const { usuario, plano, setPlano, isPremium, trialAtivo, trialBannerVisivel, setTrialBannerVisivel, fotoPerfil, darkMode, notificacoes, despensa, orcamento, gastoMes } = useApp();
+  const {
+    usuario, plano, setPlano, isPremium, trialAtivo, trialBannerVisivel, setTrialBannerVisivel,
+    fotoPerfil, darkMode, notificacoes, despensa, orcamento, gastoMes,
+    boasVindasPremium, setBoasVindasPremium,
+  } = useApp();
   const { notificarLocal } = useWebPush();
   const navigate = useNavigate();
   const [menuPlanoAberto, setMenuPlanoAberto] = useState(false);
   const [painelPerfilAberto, setPainelPerfilAberto] = useState(false);
+  const [guiaInstalacaoAberto, setGuiaInstalacaoAberto] = useState(false);
+  const [guiaComoBoasVindas, setGuiaComoBoasVindas] = useState(false);
+
+  // Assinou o Premium de verdade (não trial) e ainda não viu o passo a passo
+  // de instalação — sem adicionar à tela de início, a notificação push não
+  // funciona no iPhone/Android, e um cliente leigo não vai saber fazer isso
+  // sozinho.
+  useEffect(() => {
+    if (plano === "premium" && !boasVindasPremium) {
+      setGuiaComoBoasVindas(true);
+      setGuiaInstalacaoAberto(true);
+    }
+  }, [plano, boasVindasPremium]);
+
+  function abrirGuiaInstalacao() {
+    setGuiaComoBoasVindas(false);
+    setGuiaInstalacaoAberto(true);
+  }
+
+  function fecharGuiaInstalacao() {
+    setGuiaInstalacaoAberto(false);
+    if (guiaComoBoasVindas) {
+      setBoasVindasPremium(true);
+      setGuiaComoBoasVindas(false);
+    }
+  }
 
   // verifica condições locais e mostra notificações quando o app abre
   useEffect(() => {
@@ -181,7 +212,15 @@ export default function AppShell({ children }) {
         <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-paper to-transparent" />
       </div>
 
-      <ProfilePanel aberto={painelPerfilAberto} onFechar={() => setPainelPerfilAberto(false)} />
+      <ProfilePanel
+        aberto={painelPerfilAberto}
+        onFechar={() => setPainelPerfilAberto(false)}
+        onAbrirGuiaInstalacao={abrirGuiaInstalacao}
+      />
+
+      {guiaInstalacaoAberto && (
+        <GuiaInstalacao boasVindas={guiaComoBoasVindas} onFechar={fecharGuiaInstalacao} />
+      )}
     </div>
   );
 }
