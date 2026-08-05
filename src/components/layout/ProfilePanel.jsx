@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, UserRound } from "lucide-react";
+import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, UserRound, Clock } from "lucide-react";
 import Button from "../ui/Button";
 import Switch from "../ui/Switch";
 import { useApp } from "../../context/AppContext";
@@ -57,10 +57,16 @@ export default function ProfilePanel({ aberto, onFechar }) {
         setNotificacoes((prev) => ({ ...prev, [chave]: false }));
       }
     } else {
-      const algumAtivo = Object.entries(notificacoes).some(([k, v]) => k !== chave && v);
+      const algumAtivo = Object.entries(notificacoes).some(([k, v]) => k !== "horario" && k !== chave && v);
       if (!algumAtivo) await cancelarSubscription();
     }
   }
+
+  function atualizarHorario(novoHorario) {
+    setNotificacoes((prev) => ({ ...prev, horario: novoHorario }));
+  }
+
+  const algumaNotifAtiva = notificacoes.orcamento || notificacoes.validade || notificacoes.resumoDiario;
 
   return (
     <>
@@ -163,6 +169,19 @@ export default function ProfilePanel({ aberto, onFechar }) {
                 <Switch checked={notificacoes.resumoDiario} onChange={(v) => atualizarNotif("resumoDiario", v)} label="Resumo diário" />
               </div>
             </div>
+            {algumaNotifAtiva && (
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-ink-900/[0.06] pt-4">
+                <span className="flex items-center gap-2 text-sm font-medium text-ink-800">
+                  <Clock className="h-4 w-4 text-ink-400" /> Horário de envio
+                </span>
+                <input
+                  type="time"
+                  value={notificacoes.horario ?? "08:00"}
+                  onChange={(e) => atualizarHorario(e.target.value)}
+                  className="rounded-xl border border-ink-900/10 bg-paper px-3 py-2 text-sm text-ink-900 outline-none focus:border-forest-500 focus:ring-2 focus:ring-forest-500/15"
+                />
+              </div>
+            )}
             {erroNotif && (
               <p className="mt-3 rounded-lg bg-rose-100 px-3.5 py-2.5 text-xs font-medium text-rose-600">{erroNotif}</p>
             )}

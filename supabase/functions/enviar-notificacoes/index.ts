@@ -165,15 +165,30 @@ function statusValidade(dataValidade: string, hoje: Date): "vencido" | "vencendo
   return "valido";
 }
 
+// O servidor roda em UTC; os horários que a pessoa escolhe no app são no
+// fuso de Brasília (UTC-3, sem horário de verão desde 2019).
+function horaAtualBRT(hoje: Date): number {
+  return (hoje.getUTCHours() + 24 - 3) % 24;
+}
+
+// "HH:MM" escolhido no perfil → hora (0-23). Sem preferência salva ainda,
+// mantém o horário padrão de sempre (8h) pra não silenciar quem já tinha
+// notificação ativada antes dessa funcionalidade existir.
+function horaPreferida(horario: unknown): number {
+  if (typeof horario !== "string") return 8;
+  const hora = parseInt(horario.slice(0, 2), 10);
+  return Number.isFinite(hora) ? hora : 8;
+}
+
 type Notificacao = { title: string; body: string; url: string; tag: string };
 
 // Mesma regra de AppShell.jsx (useEffect "verifica condições locais"): despensa
 // vencendo e orçamento estourando. Antes só disparavam como notificação local
 // (só quando o usuário abria o app); agora viram push de verdade, então
 // chegam mesmo com o app fechado.
-function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoje: Date): Notificacao[] {
+function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoje: Date, horaBRT: number): Notificacao[] {
   if (!dadosUsuario) return [];
-  const prefs = (dadosUsuario.notificacoes as Record<string, boolean>) ?? {};
+  const prefs = (dadosUsuario.notificacoes as Record<string, unknown>) ?? {};
   const notificacoes: Notificacao[] = [];
 
   if (prefs.validade) {
@@ -212,8 +227,7 @@ function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoj
   }
 
   if (prefs.resumoDiario) {
-    const hora = hoje.getHours();
-    const corpo = hora >= 17
+    const corpo = horaBRT >= 17
       ? "Que itens faltam na sua lista para amanhã? Confira agora. 📋"
       : "Bom dia! Abra o app para ver sua lista e despensa de hoje. 🛒";
     notificacoes.push({ title: "Listamo", body: corpo, url: "/dashboard", tag: "diario" });
@@ -242,10 +256,16 @@ Deno.serve(async (req) => {
   const dadosPorUsuario = new Map((dados ?? []).map((d) => [d.user_id, d]));
 
   const hoje = new Date();
+  const horaAtual = horaAtualBRT(hoje);
   let enviados = 0;
 
   for (const row of subs) {
-    const notificacoes = notificacoesDoUsuario(dadosPorUsuario.get(row.user_id) ?? null, hoje);
+    const dadosUsuario = dadosPorUsuario.get(row.user_id) ?? null;
+    const prefsHorario = (dadosUsuario?.notificacoes as Record<string, unknown> | undefined)?.horario;
+    // roda de hora em hora; só segue se bater com o horário que a pessoa escolheu
+    if (horaPreferida(prefsHorario) !== horaAtual) continue;
+
+    const notificacoes = notificacoesDoUsuario(dadosUsuario, hoje, horaAtual);
     if (!notificacoes.length) continue;
 
     try {

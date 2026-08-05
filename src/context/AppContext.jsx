@@ -63,7 +63,7 @@ export function AppProvider({ children }) {
   const [nome, setNome]             = usarEstadoPersistido("listamo:nome", "");
   const [email, setEmail]           = usarEstadoPersistido("listamo:email", "");
   const [notificacoes, setNotificacoes] = usarEstadoPersistido("listamo:notificacoes", {
-    validade: false, resumoDiario: false, orcamento: false,
+    validade: false, resumoDiario: false, orcamento: false, horario: "08:00",
   });
 
   useEffect(() => {
