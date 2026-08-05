@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Share, MoreVertical, SquarePlus, Smartphone } from "lucide-react";
 import Button from "./Button";
 import { cn } from "../../utils/cn";
+import { useTravarScroll } from "../../hooks/useTravarScroll";
 
 const PASSOS = {
   ios: [
@@ -19,6 +20,7 @@ const PASSOS = {
 export default function GuiaInstalacao({ boasVindas = false, onFechar }) {
   const [sistema, setSistema] = useState("ios");
   const passos = PASSOS[sistema];
+  useTravarScroll(true);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 backdrop-blur-sm">
