@@ -16,10 +16,10 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
   const {
     usuario, plano,
     darkMode, setDarkMode, fotoPerfil, setFotoPerfil,
-    nome, setNome, email, setEmail, setNotificacoes,
+    nome, setNome, email, setEmail,
   } = useApp();
   const { sair } = useAuth();
-  const { notificacoes, atualizarNotif, erro: erroNotif } = useNotificacaoToggle();
+  const { notificacoes, atualizarNotif, atualizarHorario, erro: erroNotif } = useNotificacaoToggle();
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
@@ -50,10 +50,6 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
     onFechar();
     await sair();
     navigate("/login");
-  }
-
-  function atualizarHorario(novoHorario) {
-    setNotificacoes((prev) => ({ ...prev, horario: novoHorario }));
   }
 
   const algumaNotifAtiva = notificacoes.orcamento || notificacoes.validade || notificacoes.resumoDiario;

@@ -10,6 +10,7 @@ import Button from "../components/ui/Button";
 import ScanButton from "../components/ui/ScanButton";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
+import ConfigurarHorarioModal from "../components/ui/ConfigurarHorarioModal";
 import Switch from "../components/ui/Switch";
 import { useApp } from "../context/AppContext";
 import { useNotificacaoToggle } from "../hooks/useNotificacaoToggle";
@@ -27,9 +28,10 @@ function formatBRL(v) {
 
 export default function Dashboard() {
   const { usuario, isPremium, orcamento, setOrcamento, listas, gastoMes, despensa, historicoPrecos } = useApp();
-  const { notificacoes, atualizarNotif, erro: erroNotif } = useNotificacaoToggle();
+  const { notificacoes, atualizarNotif, atualizarHorario, erro: erroNotif } = useNotificacaoToggle();
   const navigate = useNavigate();
   const [editandoOrcamento, setEditandoOrcamento] = useState(false);
+  const [editandoHorario, setEditandoHorario] = useState(false);
 
   const listaAtiva = listas[0];
   const itensLista = listaAtiva?.itens ?? [];
@@ -76,12 +78,22 @@ export default function Dashboard() {
           />
         )}
         {isPremium && (
-          <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl border border-ink-900/[0.06] bg-paper px-3.5 py-3 shadow-soft-sm">
-            <span className="flex items-center gap-2.5 text-sm font-semibold text-ink-800">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest-100 text-forest-700">
-                <Bell className="h-4 w-4" />
+          <div className="col-span-2 flex items-center justify-between gap-3 rounded-2xl border border-ink-900/[0.06] bg-paper px-4 py-4 shadow-soft-sm">
+            <span className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-forest-100 text-forest-700">
+                <Bell className="h-5 w-5" />
               </span>
-              Alerta de item vencendo
+              <span className="min-w-0">
+                <p className="text-sm font-semibold text-ink-800">Alerta de item vencendo</p>
+                {notificacoes.validade && (
+                  <button
+                    onClick={() => setEditandoHorario(true)}
+                    className="cursor-pointer text-xs font-medium text-forest-700 hover:underline"
+                  >
+                    Configurar horário do alerta
+                  </button>
+                )}
+              </span>
             </span>
             <Switch
               checked={notificacoes.validade}
@@ -279,6 +291,14 @@ export default function Dashboard() {
           valorAtual={orcamento}
           onSalvar={setOrcamento}
           onFechar={() => setEditandoOrcamento(false)}
+        />
+      )}
+
+      {editandoHorario && (
+        <ConfigurarHorarioModal
+          valorAtual={notificacoes.horario ?? "08:00"}
+          onSalvar={atualizarHorario}
+          onFechar={() => setEditandoHorario(false)}
         />
       )}
     </div>

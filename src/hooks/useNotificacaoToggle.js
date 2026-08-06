@@ -25,5 +25,9 @@ export function useNotificacaoToggle() {
     }
   }
 
-  return { notificacoes, atualizarNotif, erro };
+  function atualizarHorario(novoHorario) {
+    setNotificacoes((prev) => ({ ...prev, horario: novoHorario }));
+  }
+
+  return { notificacoes, atualizarNotif, atualizarHorario, erro };
 }
