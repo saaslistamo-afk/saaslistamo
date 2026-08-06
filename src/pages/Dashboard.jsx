@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ListPlus, ShoppingCart, ScanLine, Archive, TrendingDown, TrendingUp,
-  AlertTriangle, CircleAlert, ArrowRight, Pencil, MoreHorizontal, Plus,
+  AlertTriangle, CircleAlert, ArrowRight, Pencil, MoreHorizontal, Plus, Bell,
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
@@ -10,7 +10,9 @@ import Button from "../components/ui/Button";
 import ScanButton from "../components/ui/ScanButton";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
+import Switch from "../components/ui/Switch";
 import { useApp } from "../context/AppContext";
+import { useNotificacaoToggle } from "../hooks/useNotificacaoToggle";
 import { CATEGORIAS, statusValidade, diasParaVencer } from "../mock/data";
 import { gastoPorCategoria, itensEsquecidos } from "../utils/precos";
 
@@ -25,6 +27,7 @@ function formatBRL(v) {
 
 export default function Dashboard() {
   const { usuario, isPremium, orcamento, setOrcamento, listas, gastoMes, despensa, historicoPrecos } = useApp();
+  const { notificacoes, atualizarNotif, erro: erroNotif } = useNotificacaoToggle();
   const navigate = useNavigate();
   const [editandoOrcamento, setEditandoOrcamento] = useState(false);
 
@@ -71,6 +74,24 @@ export default function Dashboard() {
             vencendo={despensaCritica.filter((d) => d.status === "vencendo").length}
             onClick={() => navigate("/despensa")}
           />
+        )}
+        {isPremium && (
+          <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl border border-ink-900/[0.06] bg-paper px-3.5 py-3 shadow-soft-sm">
+            <span className="flex items-center gap-2.5 text-sm font-semibold text-ink-800">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest-100 text-forest-700">
+                <Bell className="h-4 w-4" />
+              </span>
+              Alerta de item vencendo
+            </span>
+            <Switch
+              checked={notificacoes.validade}
+              onChange={(v) => atualizarNotif("validade", v)}
+              label="Alerta de item vencendo"
+            />
+          </div>
+        )}
+        {isPremium && erroNotif && (
+          <p className="col-span-2 -mt-1 text-xs font-medium text-rose-600">{erroNotif}</p>
         )}
       </div>
 

@@ -5,8 +5,8 @@ import Button from "../ui/Button";
 import Switch from "../ui/Switch";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
-import { useWebPush } from "../../hooks/useWebPush";
 import { useTravarScroll } from "../../hooks/useTravarScroll";
+import { useNotificacaoToggle } from "../../hooks/useNotificacaoToggle";
 
 function iniciais(nome) {
   return nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
@@ -16,14 +16,13 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
   const {
     usuario, plano,
     darkMode, setDarkMode, fotoPerfil, setFotoPerfil,
-    nome, setNome, email, setEmail, notificacoes, setNotificacoes,
+    nome, setNome, email, setEmail, setNotificacoes,
   } = useApp();
   const { sair } = useAuth();
-  const { solicitarPermissao, cancelarSubscription } = useWebPush();
+  const { notificacoes, atualizarNotif, erro: erroNotif } = useNotificacaoToggle();
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
-  const [erroNotif, setErroNotif] = useState("");
   function aoEscolherFoto(e) {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
@@ -51,21 +50,6 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
     onFechar();
     await sair();
     navigate("/login");
-  }
-
-  async function atualizarNotif(chave, valor) {
-    setNotificacoes((prev) => ({ ...prev, [chave]: valor }));
-    setErroNotif("");
-    if (valor) {
-      const resultado = await solicitarPermissao();
-      if (!resultado.ok) {
-        setErroNotif(resultado.motivo);
-        setNotificacoes((prev) => ({ ...prev, [chave]: false }));
-      }
-    } else {
-      const algumAtivo = Object.entries(notificacoes).some(([k, v]) => k !== "horario" && k !== chave && v);
-      if (!algumAtivo) await cancelarSubscription();
-    }
   }
 
   function atualizarHorario(novoHorario) {
