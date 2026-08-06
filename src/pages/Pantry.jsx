@@ -164,6 +164,23 @@ export default function Pantry() {
         </div>
       ) : (
         <>
+          <div className="animate-rise mt-5 flex gap-2 overflow-x-auto">
+            {FILTROS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFiltro(f.id)}
+                className={cn(
+                  "shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200",
+                  filtro === f.id
+                    ? "bg-gradient-to-r from-forest-600 to-forest-800 text-cream-50 shadow-soft"
+                    : "bg-paper text-ink-600 shadow-soft-sm hover:bg-cream-200"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {(contagem.vencido > 0 || contagem.vencendo > 0) && (
             <div className="animate-rise mt-4 flex flex-wrap gap-2.5">
               {contagem.vencido > 0 && (
@@ -180,23 +197,6 @@ export default function Pantry() {
               )}
             </div>
           )}
-
-          <div className="mt-5 flex gap-2 overflow-x-auto">
-            {FILTROS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFiltro(f.id)}
-                className={cn(
-                  "shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200",
-                  filtro === f.id
-                    ? "bg-gradient-to-r from-forest-600 to-forest-800 text-cream-50 shadow-soft"
-                    : "bg-paper text-ink-600 shadow-soft-sm hover:bg-cream-200"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtrados.map((item, i) => {
