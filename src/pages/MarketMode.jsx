@@ -164,7 +164,7 @@ function SessaoDeCompra({ lista, onTrocarLista }) {
         id: Date.now(),
         nome: nomeExtra.trim(),
         quantidade: 1,
-        preco: Number(precoExtra) || 0,
+        preco: Math.max(0, Number(precoExtra) || 0),
         categoria: inferirCategoria(nomeExtra),
         status: "carrinho",
       },

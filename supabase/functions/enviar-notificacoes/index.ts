@@ -330,7 +330,12 @@ Deno.serve(async (req) => {
       if (subscriptionExpirada) {
         await supabase.from("push_subscriptions").delete().eq("user_id", row.user_id);
       }
-    } catch {}
+    } catch (err) {
+      // Sem log aqui, uma falha isolada (subscription corrompida, erro de
+      // rede, erro de criptografia) passava despercebida pra sempre — sem
+      // nenhuma telemetria de que aquele usuário parou de receber push.
+      console.error(`[enviar-notificacoes] falha ao processar user_id ${row.user_id}:`, err);
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, enviados }), {

@@ -22,7 +22,14 @@ export default function PlanSelect() {
   const trialAindaAtivo = planoAtual === "trial" && usuario.trialDiasRestantes > 0;
 
   function assinar() {
-    window.location.href = "https://pay.cakto.com.br/ngkivkg_953027";
+    // Pré-preenche e trava o e-mail no checkout com o da conta logada — sem
+    // isso, a pessoa pode pagar com um e-mail diferente do da conta (ex.: o
+    // e-mail salvo no cartão) e o webhook nunca encontra essa conta pra
+    // liberar o Premium. Parâmetros documentados pela Cakto para checkout
+    // pré-preenchido: https://ajuda.cakto.com.br/pt/article/como-usar-url-para-checkout-pre-preenchido-j3kwax/
+    const params = new URLSearchParams({ email: usuario.email, confirmEmail: usuario.email });
+    if (usuario.nome) params.set("name", usuario.nome);
+    window.location.href = `https://pay.cakto.com.br/ngkivkg_953027?${params.toString()}`;
   }
 
   // Essa é a única tela que fica visível pra quem não é premium (RotaPrivada

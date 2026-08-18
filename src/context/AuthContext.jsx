@@ -19,11 +19,13 @@ export function AuthProvider({ children }) {
   // pelo próprio usuário via supabase.auth.updateUser(), então usá-lo para
   // liberar acesso premium é burlável no console do navegador.
   async function buscarPlanoAssinatura(user) {
-    if (!user) return null;
+    if (!user?.email) return null;
+    // Normalizado (trim + minúsculas) pra bater com o e-mail gravado pelo
+    // webhook da Cakto, que também normaliza — evita divergência de caixa.
     const { data } = await supabase
       .from("assinaturas")
       .select("plano")
-      .eq("email", user.email)
+      .eq("email", user.email.trim().toLowerCase())
       .single();
     return data?.plano ?? null;
   }
@@ -91,15 +93,26 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
   }
 
+  // Sem isso, quem não recebeu o e-mail de confirmação original (spam, atraso
+  // do provedor, digitação errada corrigida depois) ficava sem saída: não
+  // consegue entrar (conta não confirmada) nem recadastrar (e-mail já existe).
+  async function reenviarConfirmacao(email) {
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    if (error) throw error;
+  }
+
   async function recuperarSenha(email) {
+    // Dinâmico em vez de fixo — sem isso, se o domínio de produção mudar (ex.:
+    // de um subdomínio vercel.app pra um domínio próprio), o link de
+    // recuperação de senha continuaria apontando pro endereço antigo.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "https://listamoapp.vercel.app/redefinir-senha",
+      redirectTo: `${window.location.origin}/redefinir-senha`,
     });
     if (error) throw error;
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, planoAssinatura, carregandoAuth, carregandoPlano, entrar, cadastrar, sair, recuperarSenha }}>
+    <AuthContext.Provider value={{ usuario, planoAssinatura, carregandoAuth, carregandoPlano, entrar, cadastrar, sair, recuperarSenha, reenviarConfirmacao }}>
       {children}
     </AuthContext.Provider>
   );

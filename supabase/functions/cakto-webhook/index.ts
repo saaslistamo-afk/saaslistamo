@@ -41,13 +41,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "assinatura inválida" }), { status: 401 });
     }
 
-    const email    = payload.data?.customer?.email ?? payload.customer?.email ?? payload.email;
-    const evento   = payload.event ?? payload.type ?? "";
-    const compraId = payload.data?.id ?? payload.id ?? null;
+    const emailBruto = payload.data?.customer?.email ?? payload.customer?.email ?? payload.email;
+    const evento      = payload.event ?? payload.type ?? "";
+    const compraId    = payload.data?.id ?? payload.id ?? null;
 
-    if (!email) {
+    if (!emailBruto) {
       return new Response(JSON.stringify({ error: "email ausente no payload" }), { status: 400 });
     }
+    // Normalizado (trim + minúsculas) pra sempre bater com o e-mail da conta
+    // no Supabase Auth, independente de como a Cakto capitalizou o payload.
+    const email = String(emailBruto).trim().toLowerCase();
 
     const eventosAprovacao = ["compra_aprovada", "purchase_approved", "sale_approved", "order_paid"];
     const eventosRevogacao = ["reembolso", "refund", "chargeback", "estorno", "cancelamento", "subscription_cancelled"];

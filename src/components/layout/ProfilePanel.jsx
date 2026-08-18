@@ -13,6 +13,30 @@ function iniciais(nome) {
   return nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 }
 
+// Redimensiona pro maior lado ter no máximo 480px e recomprime como JPEG —
+// sem isso, uma foto de celular (4-8MB) ia inteira pro localStorage, que tem
+// só ~5-10MB de cota no total, e estourava em silêncio (ver usarEstadoPersistido).
+function comprimirImagem(arquivo, tamanhoMax = 480, qualidade = 0.82) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    leitor.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Arquivo de imagem inválido."));
+      img.onload = () => {
+        const escala = Math.min(1, tamanhoMax / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * escala);
+        canvas.height = Math.round(img.height * escala);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", qualidade));
+      };
+      img.src = leitor.result;
+    };
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
 export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }) {
   const {
     usuario, plano,
@@ -25,7 +49,7 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
-  function aoEscolherFoto(e) {
+  async function aoEscolherFoto(e) {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
     if (!arquivo.type.startsWith("image/")) {
@@ -33,9 +57,19 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
       return;
     }
     setErroFoto("");
-    const leitor = new FileReader();
-    leitor.onload = () => setFotoPerfil(leitor.result);
-    leitor.readAsDataURL(arquivo);
+    try {
+      const dataUrl = await comprimirImagem(arquivo);
+      // ~1.5MB em base64 já é um retrato generoso pra um avatar comprimido;
+      // acima disso é mais seguro avisar do que arriscar estourar a cota do
+      // localStorage (o restante do app também guarda dados ali).
+      if (dataUrl.length > 1_500_000) {
+        setErroFoto("Essa imagem ainda ficou grande demais. Tente outra foto.");
+        return;
+      }
+      setFotoPerfil(dataUrl);
+    } catch {
+      setErroFoto("Não foi possível processar essa imagem. Tente outra.");
+    }
   }
 
   function irPara(rota) {

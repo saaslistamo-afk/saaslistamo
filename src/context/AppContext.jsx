@@ -20,7 +20,11 @@ function lerLocal(chave, padrao) {
 function usarEstadoPersistido(chave, padrao) {
   const [valor, setValor] = useState(() => lerLocal(chave, padrao));
   useEffect(() => {
-    try { localStorage.setItem(chave, JSON.stringify(valor)); } catch {}
+    // Erro mais comum aqui é QuotaExceededError (localStorage cheio, ex. uma
+    // foto de perfil grande) — sem o log, o valor ficava só em memória e
+    // sumia no próximo reload sem nenhuma pista do motivo.
+    try { localStorage.setItem(chave, JSON.stringify(valor)); }
+    catch (err) { console.error(`[listamo] falha ao persistir "${chave}":`, err); }
   }, [chave, valor]);
   return [valor, setValor];
 }
@@ -36,7 +40,12 @@ export function AppProvider({ children }) {
   // o carregandoPlano virar false, mesmo já sabendo que o plano é premium.
   const [overridePlanoDev, setOverridePlanoDev] = useState(null);
   const [sincronizado, setSincronizado] = useState(false);
+  // true quando o carregamento ou o salvamento falharam de vez (após as
+  // tentativas) — usado só pra avisar a pessoa na interface que as
+  // alterações podem não estar chegando no servidor; não afeta a lógica.
+  const [erroSincronizacao, setErroSincronizacao] = useState(false);
   const saveTimerRef = useRef(null);
+  const retryTimerRef = useRef(null);
   const dadosPendentesRef = useRef(null);
   // "assinatura" (JSON) do último estado já confirmado no servidor — usada
   // pra não fazer upsert nenhum quando nada mudou desde então (ex.: abrir o
@@ -98,7 +107,26 @@ export function AppProvider({ children }) {
           mercados: (Array.isArray(data?.mercados) && data.mercados.length) ? data.mercados : mercados,
           mercado_atual: data?.mercado_atual ?? mercadoAtual,
           notificacoes: data?.notificacoes ?? notificacoes,
+          nome: data?.nome || nomeAuth,
+          dark_mode: typeof data?.dark_mode === "boolean" ? data.dark_mode : darkMode,
+          trial_banner_visivel: typeof data?.trial_banner_visivel === "boolean" ? data.trial_banner_visivel : trialBannerVisivel,
+          boas_vindas_premium: typeof data?.boas_vindas_premium === "boolean" ? data.boas_vindas_premium : boasVindasPremium,
         };
+        // Se o dispositivo tem uma edição local mais nova do que a última
+        // confirmada no servidor, o save de saída pode não ter completado a
+        // tempo (aba fechada rápido demais, rede instável) — nesse caso é o
+        // servidor que está desatualizado, não o local. Preservar o estado
+        // local e deixar o efeito de salvamento abaixo reenviá-lo assim que
+        // sincronizado virar true, em vez de sobrescrever a edição da pessoa
+        // com um dado mais velho vindo do servidor.
+        const editadoLocalmenteEm = Number(localStorage.getItem("listamo:ultimaEdicaoLocal")) || 0;
+        const servidorAtualizadoEm = data?.updated_at ? new Date(data.updated_at).getTime() : 0;
+        if (data && editadoLocalmenteEm > servidorAtualizadoEm) {
+          setErroSincronizacao(false);
+          setSincronizado(true);
+          return;
+        }
+
         if (data) {
           setListas(carregado.listas);
           setDespensaLocal(carregado.despensa);
@@ -107,8 +135,22 @@ export function AppProvider({ children }) {
           setMercados(carregado.mercados);
           setMercadoAtual(carregado.mercado_atual);
           setNotificacoes(carregado.notificacoes);
+          setNome(carregado.nome);
+          setDarkMode(carregado.dark_mode);
+          setTrialBannerVisivel(carregado.trial_banner_visivel);
+          setBoasVindasPremium(carregado.boas_vindas_premium);
         }
         ultimoSalvoRef.current = JSON.stringify(carregado);
+        setErroSincronizacao(false);
+        setSincronizado(true);
+      })
+      .catch((err) => {
+        // Sem isso, uma falha de rede aqui travava sincronizado em false pro
+        // resto da sessão — e como o efeito de salvamento abaixo só roda com
+        // sincronizado=true, nenhuma edição feita depois chegava a ser salva.
+        // Melhor seguir com o que já está no localStorage do que travar.
+        console.error("[listamo] falha ao carregar dados_usuario:", err);
+        setErroSincronizacao(true);
         setSincronizado(true);
       });
   }, [usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -125,22 +167,36 @@ export function AppProvider({ children }) {
       mercados,
       mercado_atual: mercadoAtual,
       notificacoes,
+      nome,
+      dark_mode: darkMode,
+      trial_banner_visivel: trialBannerVisivel,
+      boas_vindas_premium: boasVindasPremium,
     };
     const assinatura = JSON.stringify(dados);
     if (assinatura === ultimoSalvoRef.current) return;
+
+    // Carimbo síncrono (não espera o debounce/rede) — é o que permite ao
+    // carregamento acima perceber que existe uma edição não confirmada no
+    // servidor, mesmo que o salvamento de saída não chegue a completar.
+    try { localStorage.setItem("listamo:ultimaEdicaoLocal", String(Date.now())); } catch {}
 
     const payload = { user_id: usuario.id, ...dados, updated_at: new Date().toISOString() };
     dadosPendentesRef.current = { payload, assinatura };
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => salvarNoSupabase(dadosPendentesRef.current), 2000);
     return () => clearTimeout(saveTimerRef.current);
-  }, [sincronizado, listas, despensa, historicoPrecos, orcamento, mercados, mercadoAtual, notificacoes, usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sincronizado, listas, despensa, historicoPrecos, orcamento, mercados, mercadoAtual, notificacoes, nome, darkMode, trialBannerVisivel, boasVindasPremium, usuario?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function salvarNoSupabase({ payload, assinatura }) {
+  function salvarNoSupabase({ payload, assinatura }, tentativa = 0) {
     dadosPendentesRef.current = null;
     supabase.from("dados_usuario").upsert(payload, { onConflict: "user_id" }).then(({ error }) => {
-      if (error) { console.error("[listamo] falha ao salvar dados_usuario:", error); return; }
-      ultimoSalvoRef.current = assinatura;
+      if (!error) { ultimoSalvoRef.current = assinatura; setErroSincronizacao(false); return; }
+      console.error("[listamo] falha ao salvar dados_usuario:", error);
+      if (tentativa >= 2) { setErroSincronizacao(true); return; } // 3 tentativas no total (0, 1, 2) — desiste; a próxima edição local tenta salvar de novo
+      // Mantém disponível pro salvamento forçado de saída (visibilitychange/
+      // pagehide) poder tentar na hora, em vez de esperar o backoff todo.
+      dadosPendentesRef.current = { payload, assinatura };
+      retryTimerRef.current = setTimeout(() => salvarNoSupabase({ payload, assinatura }, tentativa + 1), 3000 * 3 ** tentativa);
     });
   }
 
@@ -153,6 +209,7 @@ export function AppProvider({ children }) {
     function forcarSalvamento() {
       if (!dadosPendentesRef.current) return;
       clearTimeout(saveTimerRef.current);
+      clearTimeout(retryTimerRef.current);
       salvarNoSupabase(dadosPendentesRef.current);
     }
     function aoMudarVisibilidade() {
@@ -257,6 +314,7 @@ export function AppProvider({ children }) {
       usuario: { nome, email, trialDiasRestantes },
       plano,
       setPlano: import.meta.env.DEV ? setOverridePlanoDev : undefined,
+      sincronizado, erroSincronizacao,
       isPremium,
       trialAtivo,
       isEssencialOuMais: isPremium,
@@ -276,7 +334,7 @@ export function AppProvider({ children }) {
       notificacoes, setNotificacoes,
     };
   }, [
-    usuario, planoAssinatura, overridePlanoDev, trialBannerVisivel, orcamento, listas, gastoMes,
+    usuario, planoAssinatura, overridePlanoDev, sincronizado, erroSincronizacao, trialBannerVisivel, orcamento, listas, gastoMes,
     mercados, mercadoAtual, historicoPrecos, ultimaCompra, despensa,
     darkMode, fotoPerfil, nome, email, notificacoes,
     boasVindasPremium,

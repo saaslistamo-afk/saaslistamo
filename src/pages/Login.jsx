@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, KeyRound, Eye, EyeOff, ArrowRight, Carrot, Croissant, Milk, ShoppingBasket } from "lucide-react";
 import Button from "../components/ui/Button";
+import Scanner from "../components/ui/Scanner";
 import { useAuth } from "../context/AuthContext";
 import logoNova from "../assets/logo-nova.png";
 import logoMark from "../assets/logo-mark.png";
-import fundoLogin from "../assets/fundo-login.webp";
 
 export default function Login() {
   const [modo, setModo] = useState("entrar");
@@ -16,11 +16,17 @@ export default function Login() {
   const [erro, setErro] = useState("");
   const [recuperando, setRecuperando] = useState(false);
   const [msgRecuperacao, setMsgRecuperacao] = useState("");
-  const { entrar, cadastrar, recuperarSenha } = useAuth();
+  const [confirmacaoPendente, setConfirmacaoPendente] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const { entrar, cadastrar, recuperarSenha, reenviarConfirmacao } = useAuth();
   const navigate = useNavigate();
 
   async function aoEnviar(e) {
     e.preventDefault();
+    if (!email.trim() || !senha) {
+      setErro("Preencha e-mail e senha.");
+      return;
+    }
     setErro("");
     setCarregando(true);
     try {
@@ -28,8 +34,9 @@ export default function Login() {
         await entrar(email, senha);
         navigate("/dashboard");
       } else {
-        const { confirmacaoPendente } = await cadastrar(email, senha);
-        if (confirmacaoPendente) {
+        const { confirmacaoPendente: pendente } = await cadastrar(email, senha);
+        if (pendente) {
+          setConfirmacaoPendente(true);
           setMsgRecuperacao("Verifique seu e-mail para ativar a conta e depois entre aqui.");
         } else {
           setMsgRecuperacao("Conta criada! Entrando...");
@@ -44,12 +51,40 @@ export default function Login() {
   }
 
   return (
-    <div
-      className="flex min-h-screen bg-cream-100 bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: `linear-gradient(rgba(250,251,252,0.6), rgba(250,251,252,0.6)), url(${fundoLogin})` }}
-    >
+    <div className="relative flex min-h-screen bg-cream-100">
+      <div className="absolute inset-0 z-0">
+        <Scanner
+          color1="#42ff00"
+          color2="#0cff00"
+          color3="#00ff1a"
+          speed={0.5}
+          sweepSpeed={0.25}
+          sweepWidth={1.6}
+          sweepFalloff={6}
+          scale={1.5}
+          frequency={2}
+          ripple={0.22}
+          bandDensity={11}
+          lineSharpness={5.5}
+          glow={0.22}
+          scanDirection="vertical"
+          colorSpread={0.7}
+          brightness={1.0}
+          contrast={1.15}
+          softness={1.4}
+          vignette={0.45}
+          scanline
+          grain
+          grainIntensity={0.05}
+          opacity={1.0}
+          mouseInteraction
+          mouseRadius={0.5}
+          mouseStrength={0.5}
+        />
+      </div>
+
       {/* Painel ilustrado — escondido em mobile */}
-      <div className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-forest-800 p-12 text-cream-50 lg:flex">
+      <div className="relative z-10 hidden w-[44%] flex-col justify-between overflow-hidden bg-forest-800 p-12 text-cream-50 lg:flex">
         <div className="paper-grain absolute inset-0" />
         <div
           className="absolute -right-24 -top-24 h-72 w-72 rounded-full opacity-20"
@@ -94,7 +129,7 @@ export default function Login() {
       </div>
 
       {/* Formulário */}
-      <div className="flex flex-1 items-center justify-center px-6 py-12">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-12">
         <div className="relative w-full max-w-sm animate-rise">
           <div className="absolute inset-x-0 bottom-full mb-4 flex justify-center lg:hidden" style={{ transform: "translateY(25%)" }}>
             <img src={logoNova} alt="Listamo" className="h-80 w-auto" />
@@ -117,10 +152,10 @@ export default function Login() {
                 <Mail className="h-4 w-4 text-ink-400" strokeWidth={2} />
                 <input
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="voce@email.com"
-
                   className="w-full bg-transparent text-sm text-ink-900 outline-none placeholder:text-ink-400"
                 />
               </span>
@@ -132,11 +167,10 @@ export default function Login() {
                 <KeyRound className="h-4 w-4 text-ink-400" strokeWidth={2} />
                 <input
                   type={verSenha ? "text" : "password"}
+                  required
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   placeholder="••••••••"
-
-
                   className="w-full bg-transparent text-sm text-ink-900 outline-none placeholder:text-ink-400"
                 />
                 <button type="button" onClick={() => setVerSenha((v) => !v)} className="cursor-pointer text-ink-400 hover:text-ink-600">
@@ -150,6 +184,24 @@ export default function Login() {
             )}
             {msgRecuperacao && (
               <p className="rounded-lg bg-forest-100 px-3.5 py-2.5 text-sm font-medium text-forest-700">{msgRecuperacao}</p>
+            )}
+
+            {confirmacaoPendente && (
+              <button
+                type="button"
+                disabled={reenviando}
+                onClick={async () => {
+                  setReenviando(true); setErro("");
+                  try {
+                    await reenviarConfirmacao(email);
+                    setMsgRecuperacao("E-mail reenviado! Confira também a caixa de spam.");
+                  } catch { setErro("Não foi possível reenviar o e-mail. Tente novamente em instantes."); }
+                  finally { setReenviando(false); }
+                }}
+                className="cursor-pointer self-center text-center text-sm font-medium text-terracotta-600 hover:text-terracotta-700"
+              >
+                {reenviando ? "Reenviando..." : "Não recebeu? Reenviar e-mail de confirmação"}
+              </button>
             )}
 
             <Button type="submit" size="lg" className="mt-2 w-full justify-between" disabled={carregando}>
@@ -180,7 +232,7 @@ export default function Login() {
           <p className="mt-6 inline-block rounded-full bg-cream-50/70 px-4 py-1.5 text-sm text-ink-600 shadow-soft-sm backdrop-blur-md">
             {modo === "entrar" ? "Ainda não tem conta?" : "Já tem uma conta?"}{" "}
             <button
-              onClick={() => { setModo(modo === "entrar" ? "criar" : "entrar"); setErro(""); setMsgRecuperacao(""); }}
+              onClick={() => { setModo(modo === "entrar" ? "criar" : "entrar"); setErro(""); setMsgRecuperacao(""); setConfirmacaoPendente(false); }}
               className="cursor-pointer font-semibold text-terracotta-600 hover:text-terracotta-700"
             >
               {modo === "entrar" ? "Testar grátis por 3 dias" : "Entrar"}

@@ -157,6 +157,7 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
   const [editandoNome, setEditandoNome] = useState(comecarRenomeando);
   const [rascunhoNome, setRascunhoNome] = useState(comecarRenomeando ? "" : lista.nome);
   const [mensagem, setMensagem] = useState("");
+  const [exportandoPDF, setExportandoPDF] = useState(false);
   const inputPrecoRef = useRef(null);
 
   function salvarNomeLista() {
@@ -176,7 +177,16 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
     const categoria = inferirCategoria(nomeProduto);
     onItensChange((prev) => [
       ...prev,
-      { id: Date.now(), nome: nomeProduto, quantidade: Number(quantidade) || 1, preco: Number(precoProduto) || 0, categoria, status: "pendente" },
+      {
+        id: Date.now(),
+        nome: nomeProduto,
+        // Number(x) || fallback deixa negativo passar direto (é truthy) —
+        // por isso o clamp explícito em vez de só o fallback pra NaN/vazio.
+        quantidade: Number(quantidade) > 0 ? Number(quantidade) : 1,
+        preco: Math.max(0, Number(precoProduto) || 0),
+        categoria,
+        status: "pendente",
+      },
     ]);
     setNome("");
     setPreco("");
@@ -201,6 +211,21 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
   }
 
   async function exportarPDF() {
+    if (exportandoPDF) return;
+    setExportandoPDF(true);
+    try {
+      await gerarEBaixarPDF();
+      setMensagem("PDF gerado e baixado — pronto para compartilhar no WhatsApp.");
+    } catch (err) {
+      console.error("[listamo] falha ao gerar PDF:", err);
+      setMensagem("Não foi possível gerar o PDF. Tente novamente.");
+    } finally {
+      setExportandoPDF(false);
+      setTimeout(() => setMensagem(""), 3000);
+    }
+  }
+
+  async function gerarEBaixarPDF() {
     const { default: jsPDF } = await import("jspdf");
     const doc = new jsPDF();
     const esquerda = 15;
@@ -251,8 +276,6 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
     doc.text(formatBRL(total), direita, y, { align: "right" });
 
     doc.save(`${lista.nome.trim().replace(/[^\w-]+/g, "_") || "lista"}.pdf`);
-    setMensagem("PDF gerado e baixado — pronto para compartilhar no WhatsApp.");
-    setTimeout(() => setMensagem(""), 3000);
   }
 
   const agrupados = Object.entries(
@@ -313,8 +336,8 @@ function EditorDeLista({ lista, onItensChange, onRenomear, onTrocarLista, onExcl
         </div>
         <div className="flex items-center gap-2 self-start">
           {isPremium && (
-            <Button variant="outline" size="sm" onClick={exportarPDF}>
-              <FileDown className="h-4 w-4" /> Exportar PDF
+            <Button variant="outline" size="sm" onClick={exportarPDF} disabled={exportandoPDF}>
+              <FileDown className="h-4 w-4" /> {exportandoPDF ? "Gerando..." : "Exportar PDF"}
             </Button>
           )}
           {itens.length > 0 && (

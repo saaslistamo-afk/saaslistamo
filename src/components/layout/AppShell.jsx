@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ListPlus, Archive, History,
-  Lock, X, Scale, ChevronDown,
+  Lock, X, Scale, ChevronDown, CloudOff,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
@@ -30,7 +30,7 @@ function iniciais(nome) {
 export default function AppShell({ children }) {
   const {
     usuario, plano, setPlano, isPremium, trialAtivo, trialBannerVisivel, setTrialBannerVisivel,
-    fotoPerfil, darkMode, notificacoes, despensa, orcamento, gastoMes,
+    fotoPerfil, darkMode, notificacoes, despensa, orcamento, gastoMes, sincronizado, erroSincronizacao,
     boasVindasPremium, setBoasVindasPremium,
   } = useApp();
   const { notificarLocal } = useWebPush();
@@ -67,6 +67,11 @@ export default function AppShell({ children }) {
   // verifica condições locais e mostra notificações quando o app abre
   useEffect(() => {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
+    // Sem esperar sincronizado, essa checagem rodava com despensa/orçamento
+    // do localStorage em cache (antes do Supabase responder) — como só roda
+    // 1x/dia, uma checagem prematura com dado desatualizado significava não
+    // checar de novo naquele dia com o dado certo.
+    if (!sincronizado) return;
 
     const hoje = new Date().toISOString().slice(0, 10);
     const ultimaVerif = localStorage.getItem("listamo:ultimaVerifNotif");
@@ -94,7 +99,10 @@ export default function AppShell({ children }) {
         "/dashboard"
       );
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Deliberadamente sem despensa/notificacoes/orcamento/gastoMes nas deps:
+    // só deve rodar de novo quando sincronizado passa a true, não a cada
+    // edição — o gate de "1x por dia" já cuida do resto.
+  }, [sincronizado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex">
@@ -140,6 +148,14 @@ export default function AppShell({ children }) {
                   </div>
                 )}
               </div>
+            )}
+            {erroSincronizacao && (
+              <Badge
+                tone="amber"
+                title="Não foi possível salvar as últimas alterações no servidor. Elas continuam salvas neste aparelho e o app vai tentar de novo."
+              >
+                <CloudOff className="h-3.5 w-3.5" /> Não sincronizado
+              </Badge>
             )}
             <button
               onClick={() => setPainelPerfilAberto(true)}

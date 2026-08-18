@@ -75,8 +75,11 @@ export default function Pantry() {
   }
 
   function salvarItem() {
-    if (!novoNome.trim()) return;
-    const quantidade = Number(novaQuantidade) || 1;
+    if (!novoNome.trim() || !novaValidade) return;
+    // Sem validade, statusValidade() cai no fallback "válido" pra sempre —
+    // o item nunca apareceria nos filtros de vencimento nem geraria alerta.
+    const quantidadeBruta = Number(novaQuantidade);
+    const quantidade = quantidadeBruta > 0 ? quantidadeBruta : 1;
     if (editandoId) {
       editarItemDespensa(editandoId, {
         nomeProduto: novoNome,
@@ -291,6 +294,7 @@ export default function Pantry() {
                   <span className="mb-1.5 block text-xs font-semibold text-ink-600">Data de validade</span>
                   <input
                     type="date"
+                    required
                     value={novaValidade}
                     onChange={(e) => setNovaValidade(e.target.value)}
                     className="w-full rounded-2xl border border-ink-900/10 bg-cream-100 px-4 py-3 text-sm outline-none focus:border-forest-500 focus:ring-2 focus:ring-forest-500/15"
@@ -360,7 +364,7 @@ function ImportarCompraModal({ compra, onFechar, onImportar }) {
     const itensNovos = compra.itens
       .map((item, i) => ({
         nomeProduto: item.produto,
-        quantidade: Number(quantidades[i]) || 1,
+        quantidade: Number(quantidades[i]) > 0 ? Number(quantidades[i]) : 1,
         dataValidade: validadePadrao,
         categoria: inferirCategoria(item.produto),
       }))
