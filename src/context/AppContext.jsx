@@ -58,6 +58,9 @@ export function AppProvider({ children }) {
   const [email, setEmail]           = usarEstadoPersistido("listamo:email", "");
   const [notificacoes, setNotificacoes] = usarEstadoPersistido("listamo:notificacoes", {
     validade: false, resumoDiario: false, orcamento: false, horario: "08:00",
+    // "unica" = 1x/dia no horário compartilhado acima (comportamento padrão/legado).
+    // "diaria"/"semanal"/"mensal" usam validadeAlertas em vez do horário compartilhado.
+    validadeFrequencia: "unica", validadeAlertas: [],
   });
 
   useEffect(() => {

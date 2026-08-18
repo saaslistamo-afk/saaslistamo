@@ -10,7 +10,7 @@ import Button from "../components/ui/Button";
 import ScanButton from "../components/ui/ScanButton";
 import CategoryIcon from "../components/ui/CategoryIcon";
 import EditBudgetModal from "../components/ui/EditBudgetModal";
-import ConfigurarHorarioModal from "../components/ui/ConfigurarHorarioModal";
+import ConfigurarAlertaValidadeModal from "../components/ui/ConfigurarAlertaValidadeModal";
 import Switch from "../components/ui/Switch";
 import { useApp } from "../context/AppContext";
 import { useNotificacaoToggle } from "../hooks/useNotificacaoToggle";
@@ -28,7 +28,7 @@ function formatBRL(v) {
 
 export default function Dashboard() {
   const { usuario, isPremium, orcamento, setOrcamento, listas, gastoMes, despensa, historicoPrecos } = useApp();
-  const { notificacoes, atualizarNotif, atualizarHorario, erro: erroNotif } = useNotificacaoToggle();
+  const { notificacoes, atualizarNotif, atualizarConfigValidade, erro: erroNotif } = useNotificacaoToggle();
   const navigate = useNavigate();
   const [editandoOrcamento, setEditandoOrcamento] = useState(false);
   const [editandoHorario, setEditandoHorario] = useState(false);
@@ -295,9 +295,13 @@ export default function Dashboard() {
       )}
 
       {editandoHorario && (
-        <ConfigurarHorarioModal
-          valorAtual={notificacoes.horario ?? "08:00"}
-          onSalvar={atualizarHorario}
+        <ConfigurarAlertaValidadeModal
+          valorAtual={{
+            frequencia: notificacoes.validadeFrequencia ?? "unica",
+            horario: notificacoes.horario ?? "08:00",
+            alertas: notificacoes.validadeAlertas ?? [],
+          }}
+          onSalvar={atualizarConfigValidade}
           onFechar={() => setEditandoHorario(false)}
         />
       )}

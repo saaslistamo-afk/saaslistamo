@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Camera, X, Moon, Sun, LogOut, Bell, Trash2, CreditCard, Clock, Smartphone } from "lucide-react";
 import Button from "../ui/Button";
 import Switch from "../ui/Switch";
+import ConfigurarAlertaValidadeModal from "../ui/ConfigurarAlertaValidadeModal";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTravarScroll } from "../../hooks/useTravarScroll";
@@ -19,7 +20,8 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
     nome, setNome, email, setEmail,
   } = useApp();
   const { sair } = useAuth();
-  const { notificacoes, atualizarNotif, atualizarHorario, erro: erroNotif } = useNotificacaoToggle();
+  const { notificacoes, atualizarNotif, atualizarHorario, atualizarConfigValidade, erro: erroNotif } = useNotificacaoToggle();
+  const [editandoValidade, setEditandoValidade] = useState(false);
   const navigate = useNavigate();
   const inputFotoRef = useRef(null);
   const [erroFoto, setErroFoto] = useState("");
@@ -148,7 +150,17 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
                 <Switch checked={notificacoes.orcamento} onChange={(v) => atualizarNotif("orcamento", v)} label="Alerta de orçamento" />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-ink-800">Validade da despensa</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink-800">Validade da despensa</span>
+                  {notificacoes.validade && (
+                    <button
+                      onClick={() => setEditandoValidade(true)}
+                      className="cursor-pointer text-xs font-medium text-forest-700 hover:underline"
+                    >
+                      Configurar frequência e horário
+                    </button>
+                  )}
+                </span>
                 <Switch checked={notificacoes.validade} onChange={(v) => atualizarNotif("validade", v)} label="Alerta de validade da despensa" />
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -212,6 +224,18 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
           </Button>
         </div>
       </aside>
+
+      {editandoValidade && (
+        <ConfigurarAlertaValidadeModal
+          valorAtual={{
+            frequencia: notificacoes.validadeFrequencia ?? "unica",
+            horario: notificacoes.horario ?? "08:00",
+            alertas: notificacoes.validadeAlertas ?? [],
+          }}
+          onSalvar={atualizarConfigValidade}
+          onFechar={() => setEditandoValidade(false)}
+        />
+      )}
     </>
   );
 }

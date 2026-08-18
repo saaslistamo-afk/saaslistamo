@@ -166,9 +166,11 @@ function statusValidade(dataValidade: string, hoje: Date): "vencido" | "vencendo
 }
 
 // O servidor roda em UTC; os horários que a pessoa escolhe no app são no
-// fuso de Brasília (UTC-3, sem horário de verão desde 2019).
-function horaAtualBRT(hoje: Date): number {
-  return (hoje.getUTCHours() + 24 - 3) % 24;
+// fuso de Brasília (UTC-3, sem horário de verão desde 2019). Deslocar a data
+// inteira (não só a hora) garante que dia da semana/mês também fiquem
+// corretos perto da virada da meia-noite BRT.
+function dataBRT(hoje: Date): Date {
+  return new Date(hoje.getTime() - 3 * 3_600_000);
 }
 
 // "HH:MM" escolhido no perfil → hora (0-23). Sem preferência salva ainda,
@@ -180,18 +182,52 @@ function horaPreferida(horario: unknown): number {
   return Number.isFinite(hora) ? hora : 8;
 }
 
+type AlertaValidade = { horario?: string; diaSemana?: number; diaMes?: number };
+
+// Decide se o alerta de validade deve disparar agora, de acordo com a
+// frequência escolhida pela usuária: "unica" (padrão/legado) usa o mesmo
+// horário compartilhado com orçamento/resumo diário; "diaria"/"semanal"/
+// "mensal" usam validadeAlertas (1 entrada por disparo configurado).
+function validadeDeveDisparar(
+  prefs: Record<string, unknown>,
+  horaAtual: number,
+  diaSemanaAtual: number,
+  diaMesAtual: number,
+): boolean {
+  const frequencia = prefs.validadeFrequencia;
+  const alertas = (prefs.validadeAlertas as AlertaValidade[] | undefined) ?? [];
+
+  if (frequencia === "diaria") {
+    return alertas.some((a) => horaPreferida(a.horario) === horaAtual);
+  }
+  if (frequencia === "semanal") {
+    return alertas.some((a) => a.diaSemana === diaSemanaAtual && horaPreferida(a.horario) === horaAtual);
+  }
+  if (frequencia === "mensal") {
+    return alertas.some((a) => a.diaMes === diaMesAtual && horaPreferida(a.horario) === horaAtual);
+  }
+  return horaPreferida(prefs.horario) === horaAtual;
+}
+
 type Notificacao = { title: string; body: string; url: string; tag: string };
 
 // Mesma regra de AppShell.jsx (useEffect "verifica condições locais"): despensa
 // vencendo e orçamento estourando. Antes só disparavam como notificação local
 // (só quando o usuário abria o app); agora viram push de verdade, então
 // chegam mesmo com o app fechado.
-function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoje: Date, horaBRT: number): Notificacao[] {
+function notificacoesDoUsuario(
+  dadosUsuario: Record<string, unknown> | null,
+  hoje: Date,
+  horaBRT: number,
+  diaSemanaAtual: number,
+  diaMesAtual: number,
+): Notificacao[] {
   if (!dadosUsuario) return [];
   const prefs = (dadosUsuario.notificacoes as Record<string, unknown>) ?? {};
   const notificacoes: Notificacao[] = [];
+  const horarioCompartilhadoBateu = horaPreferida(prefs.horario) === horaBRT;
 
-  if (prefs.validade) {
+  if (prefs.validade && validadeDeveDisparar(prefs, horaBRT, diaSemanaAtual, diaMesAtual)) {
     const despensa = (dadosUsuario.despensa as Array<{ dataValidade?: string }>) ?? [];
     let vencidos = 0;
     let vencendo = 0;
@@ -214,7 +250,7 @@ function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoj
     }
   }
 
-  if (prefs.orcamento) {
+  if (prefs.orcamento && horarioCompartilhadoBateu) {
     const orcamento = Number(dadosUsuario.orcamento) || 0;
     const mesAtual = hoje.toISOString().slice(0, 7);
     const historico = (dadosUsuario.historico_precos as Array<{ data?: string; preco?: number; quantidade?: number }>) ?? [];
@@ -232,7 +268,7 @@ function notificacoesDoUsuario(dadosUsuario: Record<string, unknown> | null, hoj
     }
   }
 
-  if (prefs.resumoDiario) {
+  if (prefs.resumoDiario && horarioCompartilhadoBateu) {
     const corpo = horaBRT >= 17
       ? "Que itens faltam na sua lista para amanhã? Confira agora. 📋"
       : "Bom dia! Abra o app para ver sua lista e despensa de hoje. 🛒";
@@ -262,16 +298,19 @@ Deno.serve(async (req) => {
   const dadosPorUsuario = new Map((dados ?? []).map((d) => [d.user_id, d]));
 
   const hoje = new Date();
-  const horaAtual = horaAtualBRT(hoje);
+  const agoraBRT = dataBRT(hoje);
+  const horaAtual = agoraBRT.getUTCHours();
+  const diaSemanaAtual = agoraBRT.getUTCDay();
+  const diaMesAtual = agoraBRT.getUTCDate();
   let enviados = 0;
 
+  // Roda de hora em hora; cada tipo de notificação decide, internamente em
+  // notificacoesDoUsuario, se o horário/dia configurado bate com agora — não
+  // dá mais pra filtrar todo mundo de uma vez com um único horário compartilhado,
+  // já que o alerta de validade pode ter seus próprios dias/horários.
   for (const row of subs) {
     const dadosUsuario = dadosPorUsuario.get(row.user_id) ?? null;
-    const prefsHorario = (dadosUsuario?.notificacoes as Record<string, unknown> | undefined)?.horario;
-    // roda de hora em hora; só segue se bater com o horário que a pessoa escolheu
-    if (horaPreferida(prefsHorario) !== horaAtual) continue;
-
-    const notificacoes = notificacoesDoUsuario(dadosUsuario, hoje, horaAtual);
+    const notificacoes = notificacoesDoUsuario(dadosUsuario, hoje, horaAtual, diaSemanaAtual, diaMesAtual);
     if (!notificacoes.length) continue;
 
     try {
