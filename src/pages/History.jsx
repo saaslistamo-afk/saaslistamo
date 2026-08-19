@@ -47,7 +47,7 @@ function BotaoApagar({ onConfirmar }) {
 }
 
 export default function History() {
-  const { historicoPrecos, gastoMes, orcamento, apagarMesHistorico } = useApp();
+  const { isPremium, historicoPrecos, gastoMes, orcamento, apagarMesHistorico } = useApp();
   const [mesSelecionado, setMesSelecionado] = useState(null);
 
   const mesAtual = useMemo(() => {
@@ -88,6 +88,20 @@ export default function History() {
 
   const todoHistorico = mesAtual ? [mesAtual, ...historicoAnterior] : historicoAnterior;
   const maiorGasto = todoHistorico.length > 0 ? Math.max(...todoHistorico.map((h) => h.total)) : 0;
+
+  // Mesmo guard que Despensa/Comparar Preços já têm — sem isso, se o trial
+  // vencesse com a pessoa navegando dentro do Histórico (sem trocar de
+  // rota), ela continuava vendo a página inteira normalmente, diferente do
+  // resto do app.
+  if (!isPremium) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center pt-20 text-center">
+        <HistoryIcon className="h-10 w-10 text-ink-300" />
+        <h1 className="mt-4 font-display text-2xl font-semibold text-ink-900">Histórico é exclusivo do Premium</h1>
+        <p className="mt-2 text-ink-600">Acompanhe seus gastos mês a mês assinando o Premium.</p>
+      </div>
+    );
+  }
 
   if (todoHistorico.length === 0) {
     return (

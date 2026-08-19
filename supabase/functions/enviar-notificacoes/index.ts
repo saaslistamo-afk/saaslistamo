@@ -7,7 +7,10 @@ const supabase = createClient(
 
 const VAPID_PUBLIC_KEY  = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
-const VAPID_SUBJECT     = "mailto:suporte@listamo.com.br";
+// Contato que os provedores de push (Apple/Google/Mozilla) usariam em caso
+// de abuso — precisa ser um endereço que exista de verdade. O domínio
+// listamo.com.br ainda não está no ar; usando o Gmail real do projeto até lá.
+const VAPID_SUBJECT     = "mailto:saaslistamo@gmail.com";
 
 const CRON_SECRET = Deno.env.get("CRON_SECRET");
 

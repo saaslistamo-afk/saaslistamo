@@ -28,6 +28,7 @@ export default function Login() {
       return;
     }
     setErro("");
+    setConfirmacaoPendente(false);
     setCarregando(true);
     try {
       if (modo === "entrar") {
@@ -45,6 +46,10 @@ export default function Login() {
       }
     } catch (err) {
       setErro(traduzirErro(err.message));
+      // Sem isso, quem cadastrou, fechou a aba antes de confirmar e volta
+      // tentando *entrar* direto (em vez de recadastrar) caía num beco sem
+      // saída: via o erro mas não tinha como reenviar o e-mail dessa tela.
+      if (err.message.includes("Email not confirmed")) setConfirmacaoPendente(true);
     } finally {
       setCarregando(false);
     }

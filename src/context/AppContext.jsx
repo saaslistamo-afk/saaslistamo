@@ -309,6 +309,19 @@ export function AppProvider({ children }) {
     const trialDiasRestantes = Math.max(0, 3 - diasUsados);
     const trialAtivo = trialDiasRestantes > 0;
     const plano = overridePlanoDev ?? planoAssinatura ?? "trial";
+    // LIMITAÇÃO CONHECIDA E ACEITA (não é bug — decisão registrada em
+    // auditoria): isPremium só existe aqui no frontend. A RLS de
+    // dados_usuario libera leitura/escrita pra qualquer dono da própria
+    // linha (auth.uid() = user_id), sem checar plano nenhum — então alguém
+    // que soubesse chamar a API do Supabase diretamente (ex.: console do
+    // navegador) poderia ler/escrever despensa, histórico etc. mesmo sem
+    // trial ativo nem assinatura. Risco aceito conscientemente: o que
+    // diferencia o Premium de verdade (push notification, scanner,
+    // exportar PDF) não é bypassável só read/write direto nessa tabela, e
+    // reforçar isso na RLS duplicaria a lógica de trial/premium em SQL, com
+    // risco real de bloquear gente legítima por engano. Se decidirem
+    // reforçar de verdade um dia, replicar esta mesma regra numa policy de
+    // dados_usuario (ver comentário em supabase/migrations sobre isso).
     const isPremium = plano === "premium" || (plano === "trial" && trialAtivo);
     return {
       usuario: { nome, email, trialDiasRestantes },

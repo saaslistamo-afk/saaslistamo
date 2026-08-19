@@ -30,22 +30,25 @@ export function AuthProvider({ children }) {
     return data?.plano ?? null;
   }
 
+  function carregarPlano(user) {
+    if (!user) { setCarregandoPlano(false); return Promise.resolve(); }
+    setCarregandoPlano(true);
+    // Timeout de segurança: se a consulta travar (rede, RLS, o que for),
+    // a UI não pode ficar presa no "carregando" pra sempre — cai pra
+    // "trial" depois de 5s, igual ao fallback que já existia pro auth.
+    const semResposta = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+    // Retorna a promise (antes só disparava e esquecia) — permite que quem
+    // chamar manualmente (ex.: botão "verificar novamente") saiba quando
+    // a checagem terminou, em vez de só torcer.
+    return Promise.race([buscarPlanoAssinatura(user), semResposta])
+      .then(setPlanoAssinatura)
+      .catch(() => {})
+      .finally(() => setCarregandoPlano(false));
+  }
+
   useEffect(() => {
     // Garante que carregandoAuth vira false mesmo se getSession travar
     const fallback = setTimeout(() => setCarregandoAuth(false), 3000);
-
-    function carregarPlano(user) {
-      if (!user) { setCarregandoPlano(false); return; }
-      setCarregandoPlano(true);
-      // Timeout de segurança: se a consulta travar (rede, RLS, o que for),
-      // a UI não pode ficar presa no "carregando" pra sempre — cai pra
-      // "trial" depois de 5s, igual ao fallback que já existia pro auth.
-      const semResposta = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
-      Promise.race([buscarPlanoAssinatura(user), semResposta])
-        .then(setPlanoAssinatura)
-        .catch(() => {})
-        .finally(() => setCarregandoPlano(false));
-    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(fallback);
@@ -77,6 +80,36 @@ export function AuthProvider({ children }) {
 
     return () => { clearTimeout(fallback); subscription.unsubscribe(); };
   }, []);
+
+  // Sem isso, o plano só era checado ao logar/recarregar — alguém que
+  // pagasse com a aba já aberta continuava vendo "assine agora" até
+  // recarregar sozinha (mitigado à parte com o botão manual), e alguém que
+  // tivesse a assinatura cancelada/reembolsada enquanto usava o app
+  // continuava com acesso Premium indefinidamente, sem nunca ser revogado
+  // durante aquela sessão. Revalida ao voltar pra aba e a cada 10 minutos.
+  useEffect(() => {
+    if (!usuario) return;
+
+    let ultimaChecagem = Date.now();
+    const DEZ_MINUTOS = 10 * 60 * 1000;
+
+    function revalidar() {
+      if (Date.now() - ultimaChecagem < 60_000) return; // evita checagens repetidas em menos de 1 min
+      ultimaChecagem = Date.now();
+      carregarPlano(usuario);
+    }
+    function aoVoltarVisivel() {
+      if (!document.hidden) revalidar();
+    }
+
+    document.addEventListener("visibilitychange", aoVoltarVisivel);
+    const intervalo = setInterval(revalidar, DEZ_MINUTOS);
+
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltarVisivel);
+      clearInterval(intervalo);
+    };
+  }, [usuario]);
 
   async function entrar(email, senha) {
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
@@ -111,8 +144,15 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }
 
+  // Permite checar o plano de novo sem precisar fechar/reabrir o app — usado
+  // pela tela de assinatura quando a pessoa já pagou mas o webhook da Cakto
+  // ainda não processou (ou a aba ficou aberta desde antes do pagamento).
+  function recarregarPlano() {
+    return carregarPlano(usuario);
+  }
+
   return (
-    <AuthContext.Provider value={{ usuario, planoAssinatura, carregandoAuth, carregandoPlano, entrar, cadastrar, sair, recuperarSenha, reenviarConfirmacao }}>
+    <AuthContext.Provider value={{ usuario, planoAssinatura, carregandoAuth, carregandoPlano, entrar, cadastrar, sair, recuperarSenha, reenviarConfirmacao, recarregarPlano }}>
       {children}
     </AuthContext.Provider>
   );

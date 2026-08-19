@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Crown, Medal, ShoppingBasket, Sparkles } from "lucide-react";
+import { Check, Crown, Medal, ShoppingBasket, Sparkles, RefreshCw, Mail, ExternalLink } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import BoasVindasPremium from "../components/ui/BoasVindasPremium";
@@ -16,10 +16,23 @@ const ESTILO_PREMIUM = {
 
 export default function PlanSelect() {
   const { plano: planoAtual, usuario } = useApp();
-  const { carregandoPlano } = useAuth();
+  const { carregandoPlano, recarregarPlano } = useAuth();
   const navigate = useNavigate();
   const [mostrarBoasVindas, setMostrarBoasVindas] = useState(false);
+  const [verificando, setVerificando] = useState(false);
+  const [jaVerificou, setJaVerificou] = useState(false);
   const trialAindaAtivo = planoAtual === "trial" && usuario.trialDiasRestantes > 0;
+
+  // Botão de saída pra quem já pagou mas a tela não atualizou sozinha (ex.:
+  // aba ficou aberta desde antes do pagamento, ou o webhook da Cakto ainda
+  // não processou) — sem isso, a única opção era fechar e reabrir o app às
+  // cegas, sem saber se ia resolver.
+  async function verificarNovamente() {
+    setVerificando(true);
+    await recarregarPlano();
+    setVerificando(false);
+    setJaVerificou(true);
+  }
 
   function assinar() {
     // Pré-preenche e trava o e-mail no checkout com o da conta logada — sem
@@ -55,6 +68,22 @@ export default function PlanSelect() {
           Você tem acesso completo a todas as funcionalidades do Listamo.
         </p>
         <Button className="mt-6" onClick={() => navigate("/dashboard")}>Voltar ao Dashboard</Button>
+
+        <div className="mt-8 w-full rounded-2xl border border-ink-900/[0.06] bg-cream-100 p-5 text-left">
+          <p className="text-sm font-semibold text-ink-800">Quer cancelar ou trocar a forma de pagamento?</p>
+          <p className="mt-1.5 text-sm text-ink-600">
+            Sua assinatura é gerenciada pela Cakto, nosso parceiro de pagamentos. Acesse com o mesmo e-mail
+            usado na compra ({usuario.email}) — não precisa de senha, é só pedir o link de acesso.
+          </p>
+          <a
+            href="https://sso.cakto.com.br/accounts/login/?next=https%3A%2F%2Fapp.cakto.com.br%2Fdashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta-600 hover:text-terracotta-700"
+          >
+            Gerenciar assinatura na Cakto <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
       </div>
     );
   }
@@ -124,6 +153,28 @@ export default function PlanSelect() {
       <p className="animate-rise mt-8 text-center text-xs text-ink-400" style={{ animationDelay: "160ms" }}>
         Pagamento processado com segurança via Cakto · Pix, cartão ou boleto
       </p>
+
+      <div className="animate-rise mt-5 flex flex-col items-center gap-2" style={{ animationDelay: "200ms" }}>
+        <button
+          type="button"
+          disabled={verificando}
+          onClick={verificarNovamente}
+          className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-forest-700 disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${verificando ? "animate-spin" : ""}`} />
+          {verificando ? "Verificando..." : "Já assinei — verificar novamente"}
+        </button>
+
+        {jaVerificou && (
+          <p className="max-w-xs text-center text-xs text-ink-500">
+            Ainda não encontramos sua assinatura. Se você já pagou, pode levar alguns minutos —
+            tente de novo em instantes ou fale com a gente:{" "}
+            <a href="mailto:saaslistamo@gmail.com" className="inline-flex items-center gap-1 font-semibold text-terracotta-600 hover:text-terracotta-700">
+              <Mail className="h-3 w-3" /> saaslistamo@gmail.com
+            </a>
+          </p>
+        )}
+      </div>
 
       {mostrarBoasVindas && (
         <BoasVindasPremium onFechar={() => { setMostrarBoasVindas(false); navigate("/dashboard"); }} />

@@ -52,8 +52,39 @@ Deno.serve(async (req) => {
     // no Supabase Auth, independente de como a Cakto capitalizou o payload.
     const email = String(emailBruto).trim().toLowerCase();
 
-    const eventosAprovacao = ["compra_aprovada", "purchase_approved", "sale_approved", "order_paid"];
-    const eventosRevogacao = ["reembolso", "refund", "chargeback", "estorno", "cancelamento", "subscription_cancelled"];
+    // Idempotência: se a Cakto reenviar exatamente este evento de novo
+    // (timeout do lado deles, retry automático, instabilidade de rede), não
+    // processa duas vezes. A tabela tem (compra_id, evento) como chave
+    // primária — inserir a mesma dupla de novo dá conflito, e a gente
+    // ignora o reenvio. Não protege contra eventos DIFERENTES chegando fora
+    // de ordem (ex.: um cancelamento antigo processado depois de uma
+    // reativação mais nova) — isso exigiria comparar um timestamp do
+    // payload, que não é confiável pra todos os tipos de evento
+    // documentados pela Cakto.
+    if (compraId) {
+      const { error: erroDedupe } = await supabase
+        .from("webhook_eventos_processados")
+        .insert({ compra_id: String(compraId), evento });
+      if (erroDedupe) {
+        if (erroDedupe.code === "23505") {
+          console.log(`[webhook] evento duplicado ignorado: ${evento} / ${compraId}`);
+          return new Response(JSON.stringify({ ok: true, duplicado: true }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        // Falha ao registrar o dedupe não deve travar um pagamento real —
+        // só loga e segue processando normalmente.
+        console.error("[webhook] falha ao registrar dedupe (seguindo mesmo assim):", erroDedupe);
+      }
+    }
+
+    // Nomes exatos confirmados na documentação oficial da Cakto
+    // (https://cakto-dece4a15.mintlify.app/webhooks/eventos) — antes eram
+    // deduzidos, e "subscription_cancelled" (duas letras "L") nunca batia
+    // com o evento real "subscription_canceled" (uma letra "L"): assinaturas
+    // canceladas nunca tinham o acesso revogado.
+    const eventosAprovacao = ["purchase_approved", "subscription_renewed"];
+    const eventosRevogacao = ["refund", "chargeback", "subscription_canceled"];
 
     if (eventosAprovacao.some((e) => evento.toLowerCase().includes(e))) {
       // Compra aprovada → promove para premium
