@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Check, Crown, Medal, ShoppingBasket, Sparkles, RefreshCw, Mail, ExternalLink } from "lucide-react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
-import BoasVindasPremium from "../components/ui/BoasVindasPremium";
 import { PLANOS } from "../mock/data";
 import { useApp } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
@@ -18,7 +17,6 @@ export default function PlanSelect() {
   const { plano: planoAtual, usuario } = useApp();
   const { carregandoPlano, recarregarPlano } = useAuth();
   const navigate = useNavigate();
-  const [mostrarBoasVindas, setMostrarBoasVindas] = useState(false);
   const [verificando, setVerificando] = useState(false);
   const [jaVerificou, setJaVerificou] = useState(false);
   const trialAindaAtivo = planoAtual === "trial" && usuario.trialDiasRestantes > 0;
@@ -175,10 +173,6 @@ export default function PlanSelect() {
           </p>
         )}
       </div>
-
-      {mostrarBoasVindas && (
-        <BoasVindasPremium onFechar={() => { setMostrarBoasVindas(false); navigate("/dashboard"); }} />
-      )}
     </div>
   );
 }

@@ -24,10 +24,19 @@ export function AuthProvider({ children }) {
     // webhook da Cakto, que também normaliza — evita divergência de caixa.
     const { data } = await supabase
       .from("assinaturas")
-      .select("plano")
+      .select("plano, valido_ate")
       .eq("email", user.email.trim().toLowerCase())
       .single();
-    return data?.plano ?? null;
+    if (!data) return null;
+    // Cancelamento não revoga na hora no webhook (ver cakto-webhook/index.ts)
+    // — o corte real acontece aqui, comparando com a data até quando o
+    // período já pago vale. "expirado" não bate com "premium" nem "trial" no
+    // isPremium (AppContext.jsx), então já cai como não-premium sem precisar
+    // de nenhuma lógica extra lá.
+    if (data.plano === "premium" && data.valido_ate && new Date(data.valido_ate) < new Date()) {
+      return "expirado";
+    }
+    return data.plano;
   }
 
   function carregarPlano(user) {
