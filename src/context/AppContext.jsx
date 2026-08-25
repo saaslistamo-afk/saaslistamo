@@ -70,6 +70,9 @@ export function AppProvider({ children }) {
     // "unica" = 1x/dia no horário compartilhado acima (comportamento padrão/legado).
     // "diaria"/"semanal"/"mensal" usam validadeAlertas em vez do horário compartilhado.
     validadeFrequencia: "unica", validadeAlertas: [],
+    // Com quantos dias de antecedência da validade avisar — [3] reproduz o
+    // comportamento padrão/legado (3 dias antes). Ver deveNotificarAntecedencia.
+    antecedenciaDias: [3],
   });
 
   useEffect(() => {

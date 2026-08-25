@@ -32,11 +32,12 @@ export function useNotificacaoToggle() {
   // Salva a frequência do alerta de validade e seus horários/dias de uma vez.
   // Quando frequencia é "unica", também atualiza o horário compartilhado
   // (o mesmo usado por orçamento/resumo diário), mantendo o comportamento legado.
-  function atualizarConfigValidade({ frequencia, horario, alertas }) {
+  function atualizarConfigValidade({ frequencia, horario, alertas, antecedenciaDias }) {
     setNotificacoes((prev) => ({
       ...prev,
       validadeFrequencia: frequencia,
       validadeAlertas: frequencia === "unica" ? [] : alertas,
+      antecedenciaDias,
       ...(frequencia === "unica" ? { horario } : {}),
     }));
   }

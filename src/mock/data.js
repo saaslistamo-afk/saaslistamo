@@ -123,6 +123,34 @@ export function statusValidade(dataValidade, hoje = new Date()) {
   return "valido";
 }
 
+// Usado só pela notificação (push/local), não pelo badge visual da despensa
+// (esse continua sempre "vencendo" a 3 dias, é convenção de exibição).
+// Marco mais apertado (menor) que o item já atingiu entre os configurados —
+// -1 pra já vencido (sempre o mais apertado possível), null se não atingiu
+// nenhum ainda. "T dias ou menos" (janela), não "exatamente T dias": assim
+// nenhum marco passa batido mesmo com frequência de verificação baixa
+// (2x/semana, 2x/mês) — o item só precisa ser checado uma vez depois de
+// entrar na janela, não bem no dia exato.
+export function marcoAntecedenciaAtingido(dataValidade, antecedenciaDias, hoje = new Date()) {
+  const dias = diasParaVencer(dataValidade, hoje);
+  if (dias < 0) return -1;
+  const atingidos = antecedenciaDias.filter((t) => dias <= t);
+  return atingidos.length ? Math.min(...atingidos) : null;
+}
+
+// Compara o marco atual com item.ultimaAntecedenciaNotificada (gravado após
+// notificar) pra decidir se é um marco NOVO — evita repetir o mesmo aviso a
+// cada checagem enquanto o item continua na mesma janela. Vencido (-1) não
+// usa essa marca d'água e sempre notifica, igual já era antes desta
+// funcionalidade — só os marcos de antecedência (pré-vencimento) deduplicam.
+export function deveNotificarAntecedencia(item, antecedenciaDias, hoje = new Date()) {
+  const marco = marcoAntecedenciaAtingido(item.dataValidade, antecedenciaDias, hoje);
+  if (marco === -1) return true;
+  if (marco === null) return false;
+  const ultimo = item.ultimaAntecedenciaNotificada;
+  return ultimo == null || marco < ultimo;
+}
+
 export function diasAtras(data, hoje = new Date()) {
   return Math.max(0, Math.round((hoje - new Date(data)) / (1000 * 60 * 60 * 24)));
 }

@@ -13,6 +13,29 @@ const DIAS_SEMANA = [
 
 const DIAS_MES = Array.from({ length: 28 }, (_, i) => i + 1);
 
+// Opções de antecedência — cada uma vira uma chave "unidade-valor" no estado
+// (ex.: "semanas-1") pra evitar ambiguidade: 7 dias só pode vir de
+// "semanas-1", nunca de "dias-7", já que "Dias" só vai até 6.
+const OPCOES_ANTECEDENCIA = [
+  { unidade: "dias", rotulo: "Dias", valores: [1, 2, 3, 4, 5, 6] },
+  { unidade: "semanas", rotulo: "Semanas", valores: [1, 2, 3] },
+  { unidade: "meses", rotulo: "Mês", valores: [1] },
+];
+
+function chaveParaDias(chave) {
+  const [unidade, valorStr] = chave.split("-");
+  const valor = Number(valorStr);
+  if (unidade === "semanas") return valor * 7;
+  if (unidade === "meses") return valor * 30;
+  return valor;
+}
+
+function diasParaChave(dias) {
+  if (dias === 30) return "meses-1";
+  if (dias % 7 === 0 && dias <= 21) return `semanas-${dias / 7}`;
+  return `dias-${dias}`;
+}
+
 const FREQUENCIAS = [
   { valor: "unica", rotulo: "1x por dia" },
   { valor: "diaria", rotulo: "2x por dia" },
@@ -47,6 +70,9 @@ export default function ConfigurarAlertaValidadeModal({ valorAtual, onSalvar, on
   const [alertas, setAlertas] = useState(
     valorAtual.alertas?.length ? valorAtual.alertas : alertasPadrao(valorAtual.frequencia ?? "unica", [])
   );
+  const [antecedencia, setAntecedencia] = useState(
+    () => new Set((valorAtual.antecedenciaDias?.length ? valorAtual.antecedenciaDias : [3]).map(diasParaChave))
+  );
   useTravarScroll(true);
 
   function trocarFrequencia(nova) {
@@ -58,13 +84,29 @@ export default function ConfigurarAlertaValidadeModal({ valorAtual, onSalvar, on
     setAlertas((prev) => prev.map((a, i) => (i === indice ? { ...a, [campo]: valor } : a)));
   }
 
+  // Nunca deixa ficar sem nenhuma opção marcada — sem antecedência nenhuma,
+  // a notificação de validade nunca dispararia (só o item já vencido conta).
+  function alternarAntecedencia(chave) {
+    setAntecedencia((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(chave)) {
+        if (novo.size === 1) return prev;
+        novo.delete(chave);
+      } else {
+        novo.add(chave);
+      }
+      return novo;
+    });
+  }
+
   function salvar() {
+    const antecedenciaDias = Array.from(antecedencia).map(chaveParaDias).sort((a, b) => a - b);
     if (frequencia === "unica") {
       if (!horarioUnico) return;
-      onSalvar({ frequencia, horario: horarioUnico, alertas: [] });
+      onSalvar({ frequencia, horario: horarioUnico, alertas: [], antecedenciaDias });
     } else {
       if (alertas.some((a) => !a.horario)) return;
-      onSalvar({ frequencia, alertas });
+      onSalvar({ frequencia, alertas, antecedenciaDias });
     }
     onFechar();
   }
@@ -81,7 +123,41 @@ export default function ConfigurarAlertaValidadeModal({ valorAtual, onSalvar, on
         <h2 className="mt-3 font-display text-lg font-semibold text-ink-900">Alerta de item vencendo</h2>
         <p className="mt-1 text-sm text-ink-500">Escolha com que frequência avisar sobre itens vencidos ou vencendo na despensa.</p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4">
+          <span className="mb-1.5 block text-xs font-semibold text-ink-600">Avisar com quanto tempo de antecedência</span>
+          <p className="mb-2 text-[0.7rem] text-ink-400">Pode escolher mais de uma opção — cada uma vira um aviso separado.</p>
+          <div className="flex flex-col gap-2.5">
+            {OPCOES_ANTECEDENCIA.map((grupo) => (
+              <div key={grupo.unidade}>
+                <span className="mb-1 block text-[0.7rem] font-medium text-ink-400">{grupo.rotulo}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {grupo.valores.map((v) => {
+                    const chave = `${grupo.unidade}-${v}`;
+                    const marcado = antecedencia.has(chave);
+                    return (
+                      <button
+                        key={chave}
+                        type="button"
+                        onClick={() => alternarAntecedencia(chave)}
+                        className={cn(
+                          "h-8 min-w-8 cursor-pointer rounded-lg px-2 text-xs font-semibold transition-colors",
+                          marcado
+                            ? "bg-forest-700 text-cream-50"
+                            : "bg-ink-900/5 text-ink-600 hover:bg-ink-900/10"
+                        )}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <span className="mt-5 mb-1.5 block text-xs font-semibold text-ink-600">Com que frequência verificar</span>
+        <div className="grid grid-cols-2 gap-2">
           {FREQUENCIAS.map((f) => (
             <button
               key={f.valor}

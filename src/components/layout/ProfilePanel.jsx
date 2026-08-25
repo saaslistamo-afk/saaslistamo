@@ -265,6 +265,7 @@ export default function ProfilePanel({ aberto, onFechar, onAbrirGuiaInstalacao }
             frequencia: notificacoes.validadeFrequencia ?? "unica",
             horario: notificacoes.horario ?? "08:00",
             alertas: notificacoes.validadeAlertas ?? [],
+            antecedenciaDias: notificacoes.antecedenciaDias ?? [3],
           }}
           onSalvar={atualizarConfigValidade}
           onFechar={() => setEditandoValidade(false)}

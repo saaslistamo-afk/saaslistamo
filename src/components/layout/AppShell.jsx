@@ -6,7 +6,7 @@ import {
 import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import { useWebPush } from "../../hooks/useWebPush";
-import { statusValidade } from "../../mock/data";
+import { deveNotificarAntecedencia, marcoAntecedenciaAtingido } from "../../mock/data";
 import Badge from "../ui/Badge";
 import logoName from "../../assets/logo-name.png";
 import logoNameDark from "../../assets/logo-name-dark.png";
@@ -30,7 +30,7 @@ function iniciais(nome) {
 export default function AppShell({ children }) {
   const {
     usuario, plano, setPlano, isPremium, trialAtivo, trialBannerVisivel, setTrialBannerVisivel,
-    fotoPerfil, darkMode, notificacoes, despensa, orcamento, gastoMes, sincronizado, erroSincronizacao,
+    fotoPerfil, darkMode, notificacoes, despensa, editarItemDespensa, orcamento, gastoMes, sincronizado, erroSincronizacao,
     boasVindasPremium, setBoasVindasPremium,
   } = useApp();
   const { notificarLocal } = useWebPush();
@@ -79,16 +79,21 @@ export default function AppShell({ children }) {
     localStorage.setItem("listamo:ultimaVerifNotif", hoje);
 
     if (notificacoes.validade) {
-      const criticos = despensa.filter((d) => {
-        const s = statusValidade(d.dataValidade);
-        return s === "vencendo" || s === "vencido";
-      });
+      const antecedenciaDias = notificacoes.antecedenciaDias?.length ? notificacoes.antecedenciaDias : [3];
+      const criticos = despensa.filter((d) => deveNotificarAntecedencia(d, antecedenciaDias));
       if (criticos.length > 0) {
         notificarLocal(
           "Atenção na despensa!",
           `${criticos.length} ${criticos.length === 1 ? "item está" : "itens estão"} vencendo ou vencidos. Confira agora.`,
           "/despensa"
         );
+        // Marca o marco de antecedência já avisado (vencido não usa marca
+        // d'água, sempre notifica de novo) — sem isso, o mesmo item repetiria
+        // o aviso todo santo dia enquanto continuasse na mesma janela.
+        criticos.forEach((d) => {
+          const marco = marcoAntecedenciaAtingido(d.dataValidade, antecedenciaDias);
+          if (marco !== -1) editarItemDespensa(d.id, { ultimaAntecedenciaNotificada: marco });
+        });
       }
     }
 

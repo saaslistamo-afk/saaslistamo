@@ -158,14 +158,17 @@ async function enviarPush(subscription: { endpoint: string; keys: { p256dh: stri
   return { status: res.status, corpo };
 }
 
-// Mesma regra de src/mock/data.js (statusValidade): vencido = já passou,
-// vencendo = até 3 dias. Duplicada aqui porque a function roda em Deno,
-// sem acesso ao código do frontend.
-function statusValidade(dataValidade: string, hoje: Date): "vencido" | "vencendo" | "valido" {
+// Mesma regra de src/mock/data.js (marcoAntecedenciaAtingido): -1 = já
+// vencido (sempre o marco mais apertado possível), null = ainda não atingiu
+// nenhum marco configurado, ou o menor marco (em dias) já atingido — "T dias
+// ou menos" (janela), não "exatamente T dias", pra nenhum marco passar
+// batido mesmo com frequência de verificação baixa (2x/semana, 2x/mês).
+// Duplicada aqui porque a function roda em Deno, sem acesso ao frontend.
+function marcoAntecedenciaAtingido(dataValidade: string, antecedenciaDias: number[], hoje: Date): number | null {
   const dias = Math.ceil((new Date(dataValidade).getTime() - hoje.getTime()) / 86_400_000);
-  if (dias < 0) return "vencido";
-  if (dias <= 3) return "vencendo";
-  return "valido";
+  if (dias < 0) return -1;
+  const atingidos = antecedenciaDias.filter((t) => dias <= t);
+  return atingidos.length ? Math.min(...atingidos) : null;
 }
 
 // O servidor roda em UTC; os horários que a pessoa escolhe no app são no
@@ -213,33 +216,49 @@ function validadeDeveDisparar(
 }
 
 type Notificacao = { title: string; body: string; url: string; tag: string };
+type ItemDespensa = { id?: unknown; dataValidade?: string; ultimaAntecedenciaNotificada?: number | null; [k: string]: unknown };
 
 // Mesma regra de AppShell.jsx (useEffect "verifica condições locais"): despensa
 // vencendo e orçamento estourando. Antes só disparavam como notificação local
 // (só quando o usuário abria o app); agora viram push de verdade, então
 // chegam mesmo com o app fechado.
+//
+// despensaAtualizada vem preenchida (não-null) só quando algum item precisa
+// gravar um novo ultimaAntecedenciaNotificada — o chamador é quem persiste
+// isso no banco, essa função não tem acesso ao client do supabase.
 function notificacoesDoUsuario(
   dadosUsuario: Record<string, unknown> | null,
   hoje: Date,
   horaBRT: number,
   diaSemanaAtual: number,
   diaMesAtual: number,
-): Notificacao[] {
-  if (!dadosUsuario) return [];
+): { notificacoes: Notificacao[]; despensaAtualizada: ItemDespensa[] | null } {
+  if (!dadosUsuario) return { notificacoes: [], despensaAtualizada: null };
   const prefs = (dadosUsuario.notificacoes as Record<string, unknown>) ?? {};
   const notificacoes: Notificacao[] = [];
   const horarioCompartilhadoBateu = horaPreferida(prefs.horario) === horaBRT;
+  let despensaAtualizada: ItemDespensa[] | null = null;
 
   if (prefs.validade && validadeDeveDisparar(prefs, horaBRT, diaSemanaAtual, diaMesAtual)) {
-    const despensa = (dadosUsuario.despensa as Array<{ dataValidade?: string }>) ?? [];
+    const despensa = (dadosUsuario.despensa as ItemDespensa[]) ?? [];
+    const antecedenciaDias = (prefs.antecedenciaDias as number[] | undefined)?.length ? (prefs.antecedenciaDias as number[]) : [3];
     let vencidos = 0;
     let vencendo = 0;
-    for (const d of despensa) {
-      if (!d.dataValidade) continue;
-      const s = statusValidade(d.dataValidade, hoje);
-      if (s === "vencido") vencidos++;
-      else if (s === "vencendo") vencendo++;
-    }
+    let mudou = false;
+    const novaDespensa = despensa.map((d) => {
+      if (!d.dataValidade) return d;
+      const marco = marcoAntecedenciaAtingido(d.dataValidade, antecedenciaDias, hoje);
+      if (marco === -1) { vencidos++; return d; } // vencido: sempre conta, sem marca d'água (igual já era antes)
+      if (marco === null) return d;
+      const ultimo = d.ultimaAntecedenciaNotificada;
+      if (ultimo == null || marco < ultimo) {
+        vencendo++;
+        mudou = true;
+        return { ...d, ultimaAntecedenciaNotificada: marco };
+      }
+      return d; // já notificado pra esse marco (ou um mais apertado) antes
+    });
+    if (mudou) despensaAtualizada = novaDespensa;
     if (vencidos > 0 || vencendo > 0) {
       const partes: string[] = [];
       if (vencendo > 0) partes.push(`${vencendo} ${vencendo === 1 ? "item está" : "itens estão"} vencendo`);
@@ -278,7 +297,7 @@ function notificacoesDoUsuario(
     notificacoes.push({ title: "Listamo", body: corpo, url: "/dashboard", tag: "diario" });
   }
 
-  return notificacoes;
+  return { notificacoes, despensaAtualizada };
 }
 
 Deno.serve(async (req) => {
@@ -313,7 +332,21 @@ Deno.serve(async (req) => {
   // já que o alerta de validade pode ter seus próprios dias/horários.
   for (const row of subs) {
     const dadosUsuario = dadosPorUsuario.get(row.user_id) ?? null;
-    const notificacoes = notificacoesDoUsuario(dadosUsuario, hoje, horaAtual, diaSemanaAtual, diaMesAtual);
+    const { notificacoes, despensaAtualizada } = notificacoesDoUsuario(dadosUsuario, hoje, horaAtual, diaSemanaAtual, diaMesAtual);
+
+    // Grava a marca d'água de antecedência já notificada mesmo que o envio do
+    // push falhe depois — o que importa é não repetir o MESMO marco de novo,
+    // não garantir que esse envio específico chegou.
+    if (despensaAtualizada) {
+      const { error: erroDespensa } = await supabase
+        .from("dados_usuario")
+        .update({ despensa: despensaAtualizada })
+        .eq("user_id", row.user_id);
+      if (erroDespensa) {
+        console.error(`[enviar-notificacoes] falha ao atualizar despensa (marca de antecedência) user_id ${row.user_id}:`, erroDespensa);
+      }
+    }
+
     if (!notificacoes.length) continue;
 
     try {
